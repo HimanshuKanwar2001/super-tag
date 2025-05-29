@@ -8,17 +8,23 @@ import { KeywordResults } from '@/components/keyword-results';
 import { getKeywordsAction } from './actions';
 import type { SuggestKeywordsInput, SuggestKeywordsOutput } from '@/ai/flows/suggest-keywords';
 import { useToast } from "@/hooks/use-toast";
-import { AlertCircle } from 'lucide-react';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { LimitReachedPopup } from '@/components/limit-reached-popup'; // New import
 
 const CLIENT_MAX_GENERATIONS_PER_DAY = 5;
 const CLIENT_USAGE_STORAGE_KEY = 'keywordGeneratorUsage';
-const REFERRAL_CODE_STORAGE_KEY = 'referralCode';
+const REFERRAL_CODE_STORAGE_KEY = 'referralCodeData'; // Updated key
+const REFERRAL_CODE_EXPIRY_DAYS = 30;
+const COMMUNITY_URL_PLACEHOLDER = 'https://example.com/community'; // Placeholder
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 
 interface ClientUsageData {
   count: number;
   lastReset: number; // Timestamp of the last reset
+}
+
+interface ReferralCodeData {
+  code: string;
+  expiresAt: number; // Timestamp
 }
 
 export default function HomePage() {
@@ -30,36 +36,76 @@ export default function HomePage() {
   const [maxGenerations, setMaxGenerations] = useState<number>(CLIENT_MAX_GENERATIONS_PER_DAY);
   const [resetTime, setResetTime] = useState<number | undefined>(undefined);
   const [isLimitReached, setIsLimitReached] = useState(false);
-  const [formattedResetTimeForAlert, setFormattedResetTimeForAlert] = useState<string | null>(null);
+  
+  const [isLimitPopupOpen, setIsLimitPopupOpen] = useState(false);
+  const [storedReferralCode, setStoredReferralCode] = useState<string | null>(null);
   
   const { toast } = useToast();
 
-  const loadUsageFromLocalStorage = useCallback(() => {
+  const loadDataFromLocalStorage = useCallback(() => {
     const now = Date.now();
+
+    // Load Usage Data
     try {
-      const storedData = localStorage.getItem(CLIENT_USAGE_STORAGE_KEY);
-      if (storedData) {
-        const usage: ClientUsageData = JSON.parse(storedData);
+      const storedUsage = localStorage.getItem(CLIENT_USAGE_STORAGE_KEY);
+      if (storedUsage) {
+        const usage: ClientUsageData = JSON.parse(storedUsage);
         if (now < usage.lastReset + ONE_DAY_MS) {
-          // Still within the 24-hour window
           setRemainingGenerations(usage.count);
           setResetTime(usage.lastReset + ONE_DAY_MS);
-          setIsLimitReached(usage.count <= 0);
+          const limitReached = usage.count <= 0;
+          setIsLimitReached(limitReached);
+          if (limitReached && !isLimitPopupOpen) { // Open popup if limit reached on load
+            // setIsLimitPopupOpen(true); // This might be too aggressive on page load, let's trigger on action
+          }
         } else {
-          // 24-hour window has passed, reset
           resetClientUsage();
         }
       } else {
-        // No data, initialize
         resetClientUsage();
       }
     } catch (e) {
       console.error("Failed to load usage data from localStorage:", e);
-      // Fallback to default if localStorage is corrupt or inaccessible
       resetClientUsage();
     }
     setMaxGenerations(CLIENT_MAX_GENERATIONS_PER_DAY);
-  }, []);
+
+    // Load/Update Referral Code
+    const queryParams = new URLSearchParams(window.location.search);
+    const urlReferralCode = queryParams.get('referralCode');
+    let activeReferralCode: string | null = null;
+
+    if (urlReferralCode) {
+      const newReferralData: ReferralCodeData = {
+        code: urlReferralCode,
+        expiresAt: now + REFERRAL_CODE_EXPIRY_DAYS * ONE_DAY_MS,
+      };
+      localStorage.setItem(REFERRAL_CODE_STORAGE_KEY, JSON.stringify(newReferralData));
+      activeReferralCode = urlReferralCode;
+      console.log(`Referral code "${urlReferralCode}" from URL stored/updated. Expires: ${new Date(newReferralData.expiresAt).toLocaleDateString()}`);
+      // Clean URL to prevent re-processing on refresh, optional
+      // window.history.replaceState({}, document.title, window.location.pathname);
+    } else {
+      const storedReferralString = localStorage.getItem(REFERRAL_CODE_STORAGE_KEY);
+      if (storedReferralString) {
+        try {
+          const storedData: ReferralCodeData = JSON.parse(storedReferralString);
+          if (now < storedData.expiresAt) {
+            activeReferralCode = storedData.code;
+            console.log(`Using stored referral code "${activeReferralCode}". Expires: ${new Date(storedData.expiresAt).toLocaleDateString()}`);
+          } else {
+            console.log("Stored referral code has expired.");
+            localStorage.removeItem(REFERRAL_CODE_STORAGE_KEY);
+          }
+        } catch (e) {
+          console.error("Error parsing stored referral data:", e);
+          localStorage.removeItem(REFERRAL_CODE_STORAGE_KEY);
+        }
+      }
+    }
+    setStoredReferralCode(activeReferralCode);
+
+  }, [isLimitPopupOpen]); // Added isLimitPopupOpen to dependencies, though it might not be strictly needed here.
 
   const resetClientUsage = () => {
     const now = Date.now();
@@ -68,58 +114,44 @@ export default function HomePage() {
     setRemainingGenerations(newUsage.count);
     setResetTime(newUsage.lastReset + ONE_DAY_MS);
     setIsLimitReached(newUsage.count <= 0);
+    setIsLimitPopupOpen(false); // Close popup on reset
   };
 
   const recordClientGeneration = () => {
     const now = Date.now();
-    const newCount = remainingGenerations - 1;
-    // Ensure lastReset reflects the start of the current 24h cycle
-    // It should have been set correctly by loadUsageFromLocalStorage or resetClientUsage
+    const newCount = Math.max(0, remainingGenerations - 1); // Ensure count doesn't go below 0
     const currentLastReset = resetTime ? resetTime - ONE_DAY_MS : now; 
     const newUsage: ClientUsageData = { count: newCount, lastReset: currentLastReset };
     localStorage.setItem(CLIENT_USAGE_STORAGE_KEY, JSON.stringify(newUsage));
     setRemainingGenerations(newCount);
-    setIsLimitReached(newCount <= 0);
+    const limitReached = newCount <= 0;
+    setIsLimitReached(limitReached);
+    if (limitReached) {
+      setIsLimitPopupOpen(true);
+    }
   };
 
   useEffect(() => {
-    loadUsageFromLocalStorage();
+    loadDataFromLocalStorage();
+  }, [loadDataFromLocalStorage]);
 
-    // Check for referralCode in URL and store it
-    if (typeof window !== 'undefined') {
-      const queryParams = new URLSearchParams(window.location.search);
-      const referralCode = queryParams.get('referralCode');
-      if (referralCode) {
-        localStorage.setItem(REFERRAL_CODE_STORAGE_KEY, referralCode);
-        console.log(`Referral code "${referralCode}" stored in localStorage.`);
-        // Optional: You might want to remove the referral code from the URL 
-        // after storing it to prevent it from being re-processed or shared.
-        // Example: window.history.replaceState({}, document.title, window.location.pathname);
-      }
-    }
-  }, [loadUsageFromLocalStorage]);
-
-  useEffect(() => {
-    if (resetTime) {
-      setFormattedResetTimeForAlert(new Date(resetTime).toLocaleTimeString());
-    } else {
-      setFormattedResetTimeForAlert(null);
-    }
-  }, [resetTime]);
 
   const handleGenerateKeywords = async (values: SuggestKeywordsInput) => {
-    setError(null); // Clear previous errors
+    setError(null); 
 
-    if (isLimitReached) {
-      const limitErrorMsg = `Daily limit of ${CLIENT_MAX_GENERATIONS_PER_DAY} generations reached. Please try again after ${formattedResetTimeForAlert || 'the reset time'}.`;
-      setError(limitErrorMsg);
-      toast({
-        variant: "destructive",
-        title: "Daily Limit Reached",
-        description: limitErrorMsg,
-      });
-      setIsLoading(false);
-      return;
+    // Check limit *before* API call
+    if (remainingGenerations <= 0) { // Re-check here in case state is stale
+        setIsLimitReached(true); // Ensure state is accurate
+        setIsLimitPopupOpen(true);
+        setError(`Daily limit of ${CLIENT_MAX_GENERATIONS_PER_DAY} generations reached.`);
+        // Toast is optional here as popup is more prominent
+        // toast({
+        //   variant: "destructive",
+        //   title: "Daily Limit Reached",
+        //   description: `Please try again after ${resetTime ? new Date(resetTime).toLocaleTimeString() : 'the reset time'}.`,
+        // });
+        setIsLoading(false);
+        return;
     }
 
     setIsLoading(true);
@@ -128,15 +160,13 @@ export default function HomePage() {
 
     if (response.success) {
       setResults(response.data);
-      recordClientGeneration(); // Record successful generation
+      recordClientGeneration(); 
       toast({
         title: "Keywords Generated!",
         description: "Successfully fetched keyword suggestions.",
       });
     } else {
       setError(response.error);
-      // Do not decrement count for failed server-side actions (e.g. validation error, AI error)
-      // Only decrement for successful generation or if limit was hit client-side *before* call.
       toast({
         variant: "destructive",
         title: "Error Generating Keywords",
@@ -145,6 +175,14 @@ export default function HomePage() {
     }
     setIsLoading(false);
   };
+  
+  // Effect to open popup if limit is reached and component is aware
+  useEffect(() => {
+    if (isLimitReached && resetTime && Date.now() < resetTime) {
+       // setIsLimitPopupOpen(true); // This can be triggered here or on action. Let's prefer triggering on action.
+    }
+  }, [isLimitReached, resetTime]);
+
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
@@ -158,33 +196,25 @@ export default function HomePage() {
               Get AI-powered keyword suggestions to rank higher and boost engagement for your Reels and Shorts.
             </p>
             <p className="mt-2 text-xs text-muted-foreground/80">
-              (Prototype Feature: Daily usage limit is stored in your browser and resets every 24 hours.)
+              (Daily usage limit of {CLIENT_MAX_GENERATIONS_PER_DAY} generations is stored in your browser and resets every 24 hours.)
             </p>
           </div>
           
-          {isLimitReached && formattedResetTimeForAlert && (
-            <Alert variant="destructive" className="mb-6">
-              <AlertCircle className="h-4 w-4" />
-              <AlertTitle>Daily Limit Reached</AlertTitle>
-              <AlertDescription>
-                You have used all your keyword generations for today. Please try again after {formattedResetTimeForAlert}.
-              </AlertDescription>
-            </Alert>
-          )}
+          {/* Removed old Alert for limit reached */}
 
           <div className="grid md:grid-cols-2 gap-8 items-stretch">
             <div className="bg-card p-6 sm:p-8 rounded-xl shadow-xl h-full flex flex-col">
               <KeywordForm 
                 onSubmit={handleGenerateKeywords} 
-                isLoading={isLoading && !results} // Show loading on form only if results aren't there yet
-                isDisabled={isLoading || isLimitReached} // Disable if loading or limit reached
+                isLoading={isLoading && !results} 
+                isDisabled={isLoading || isLimitReached} 
               />
             </div>
             
             <div className="h-full flex flex-col">
               <KeywordResults 
                 results={results} 
-                isLoading={isLoading && (results === null)} // Show loading on results only if they are truly null
+                isLoading={isLoading && (results === null)} 
                 error={error} 
                 remainingGenerations={remainingGenerations}
                 maxGenerations={maxGenerations}
@@ -194,6 +224,13 @@ export default function HomePage() {
           </div>
         </section>
       </main>
+      <LimitReachedPopup
+        isOpen={isLimitPopupOpen}
+        onClose={() => setIsLimitPopupOpen(false)}
+        resetTime={resetTime}
+        referralCode={storedReferralCode}
+        communityUrl={COMMUNITY_URL_PLACEHOLDER}
+      />
     </div>
   );
 }

@@ -13,6 +13,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 const CLIENT_MAX_GENERATIONS_PER_DAY = 5;
 const CLIENT_USAGE_STORAGE_KEY = 'keywordGeneratorUsage';
+const REFERRAL_CODE_STORAGE_KEY = 'referralCode';
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 
 interface ClientUsageData {
@@ -83,6 +84,19 @@ export default function HomePage() {
 
   useEffect(() => {
     loadUsageFromLocalStorage();
+
+    // Check for referralCode in URL and store it
+    if (typeof window !== 'undefined') {
+      const queryParams = new URLSearchParams(window.location.search);
+      const referralCode = queryParams.get('referralCode');
+      if (referralCode) {
+        localStorage.setItem(REFERRAL_CODE_STORAGE_KEY, referralCode);
+        console.log(`Referral code "${referralCode}" stored in localStorage.`);
+        // Optional: You might want to remove the referral code from the URL 
+        // after storing it to prevent it from being re-processed or shared.
+        // Example: window.history.replaceState({}, document.title, window.location.pathname);
+      }
+    }
   }, [loadUsageFromLocalStorage]);
 
   useEffect(() => {

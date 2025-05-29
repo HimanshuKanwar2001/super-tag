@@ -1,3 +1,4 @@
+
 'use client';
 
 import type React from 'react';
@@ -5,8 +6,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ThumbsUp, AlertCircle, Info } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { ThumbsUp, AlertCircle, Info, Copy } from 'lucide-react';
 import type { SuggestKeywordsOutput } from '@/ai/flows/suggest-keywords';
+import { useToast } from "@/hooks/use-toast";
 
 interface KeywordResultsProps {
   results: SuggestKeywordsOutput | null;
@@ -15,6 +18,29 @@ interface KeywordResultsProps {
 }
 
 export function KeywordResults({ results, isLoading, error }: KeywordResultsProps) {
+  const { toast } = useToast();
+
+  const handleCopyAllKeywords = () => {
+    if (results && results.keywords.length > 0) {
+      const allKeywordsText = results.keywords.join(', ');
+      navigator.clipboard.writeText(allKeywordsText)
+        .then(() => {
+          toast({
+            title: 'Keywords Copied!',
+            description: 'All keywords have been copied to your clipboard.',
+          });
+        })
+        .catch(err => {
+          console.error('Failed to copy keywords: ', err);
+          toast({
+            variant: 'destructive',
+            title: 'Copy Failed',
+            description: 'Could not copy keywords to clipboard.',
+          });
+        });
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="space-y-4 mt-8">
@@ -69,10 +95,18 @@ export function KeywordResults({ results, isLoading, error }: KeywordResultsProp
 
   return (
     <div className="mt-10 space-y-6">
-      <h2 className="text-2xl font-semibold text-foreground flex items-center">
-        <ThumbsUp className="mr-3 h-7 w-7 text-primary" />
-        Suggested Keywords
-      </h2>
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <h2 className="text-2xl font-semibold text-foreground flex items-center">
+          <ThumbsUp className="mr-3 h-7 w-7 text-primary" />
+          Suggested Keywords
+        </h2>
+        {results.keywords.length > 0 && (
+          <Button onClick={handleCopyAllKeywords} variant="outline" size="sm">
+            <Copy className="mr-2 h-4 w-4" />
+            Copy All Keywords
+          </Button>
+        )}
+      </div>
       <Accordion type="single" collapsible className="w-full">
         {results.keywords.map((keyword, index) => (
           <AccordionItem value={`item-${index}`} key={index} className="bg-card border-border rounded-lg mb-3 shadow-sm hover:shadow-md transition-shadow duration-200">

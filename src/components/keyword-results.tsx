@@ -144,8 +144,8 @@ export function KeywordResults({ results, isLoading, error }: KeywordResultsProp
           <div className="space-y-4">
             {results.keywords.map((keyword, index) => (
               <div key={index} className="p-4 rounded-md border border-border/70 bg-card hover:shadow-md transition-shadow">
-                <h4 className="text-md font-semibold text-primary mb-1">{keyword}</h4>
-                <p className="text-sm text-foreground/80">
+                <h4 className="text-md font-semibold text-primary mb-1 break-words">{keyword}</h4>
+                <p className="text-sm text-foreground/80 break-words">
                   {results.keywordExplanations[index] || 'No explanation available.'}
                 </p>
               </div>

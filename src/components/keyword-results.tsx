@@ -22,7 +22,8 @@ export function KeywordResults({ results, isLoading, error }: KeywordResultsProp
 
   const handleCopyAllKeywords = () => {
     if (results && results.keywords.length > 0) {
-      const allKeywordsText = results.keywords.join(', ');
+      const keywordsString = results.keywords.join(', ');
+      const allKeywordsText = `[${keywordsString}]`;
       navigator.clipboard.writeText(allKeywordsText)
         .then(() => {
           toast({

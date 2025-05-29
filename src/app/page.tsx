@@ -3,7 +3,7 @@
 
 import type React from 'react';
 import { useState } from 'react';
-import { AppHeader } from '@/components/layout/header';
+// import { AppHeader } from '@/components/layout/header'; // Removed AppHeader import
 import { KeywordForm } from '@/components/keyword-form';
 import { KeywordResults } from '@/components/keyword-results';
 import { getKeywordsAction } from './actions';
@@ -41,8 +41,8 @@ export default function HomePage() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col">
-      <AppHeader />
+    <div className="min-h-screen flex flex-col bg-background">
+      {/* <AppHeader /> */} {/* AppHeader component removed */}
       <main className="flex-grow container mx-auto px-4 md:px-6 py-8 md:py-12">
         <section className="max-w-6xl mx-auto">
           <div className="text-center mb-8 md:mb-12">
@@ -54,20 +54,22 @@ export default function HomePage() {
             </p>
           </div>
           
-          <div className="grid md:grid-cols-2 gap-8 items-stretch"> {/* Changed items-start to items-stretch */}
-            <div className="bg-card p-6 sm:p-8 rounded-xl shadow-xl h-full flex flex-col"> {/* Added h-full and flex flex-col */}
+          <div className="grid md:grid-cols-2 gap-8 items-stretch">
+            <div className="bg-card p-6 sm:p-8 rounded-xl shadow-xl h-full flex flex-col">
               <KeywordForm onSubmit={handleGenerateKeywords} isLoading={isLoading} />
             </div>
             
-            <div className="h-full flex flex-col"> {/* Added h-full and flex flex-col for the results container */}
+            <div className="h-full flex flex-col">
               <KeywordResults results={results} isLoading={isLoading} error={error} />
             </div>
           </div>
         </section>
       </main>
+      {/* 
       <footer className="py-6 text-center text-sm text-muted-foreground border-t border-border/60">
         © {new Date().getFullYear()} ReelRank Keywords. All rights reserved.
-      </footer>
+      </footer> 
+      */} {/* Footer removed */}
     </div>
   );
 }

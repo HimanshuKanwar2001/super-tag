@@ -51,11 +51,8 @@ export function KeywordResults({ results, isLoading, error }: KeywordResultsProp
             </CardTitle>
         </CardHeader>
         <CardContent className="flex-grow space-y-4">
-          {[...Array(5)].map((_, i) => (
-            <div key={i} className="space-y-2">
-              <Skeleton className="h-5 w-3/4" />
-              <Skeleton className="h-4 w-full" />
-            </div>
+          {[...Array(3)].map((_, i) => ( // Reduced skeleton items as it's one line now
+            <Skeleton key={i} className="h-5 w-full" />
           ))}
         </CardContent>
       </Card>
@@ -139,13 +136,11 @@ export function KeywordResults({ results, isLoading, error }: KeywordResultsProp
         )}
       </CardHeader>
       <CardContent className="flex-grow overflow-hidden">
-        <ScrollArea className="h-full pr-4"> {/* Added pr-4 for scrollbar spacing */}
-          <div className="space-y-2"> {/* Reduced spacing between keywords */}
-            {results.keywords.map((keyword, index) => (
-              <div key={index} className="p-3 rounded-md border border-border/70 bg-card hover:shadow-md transition-shadow"> {/* Reduced padding */}
-                <h4 className="text-md font-semibold text-primary break-words">{keyword}</h4>
-              </div>
-            ))}
+        <ScrollArea className="h-full pr-4">
+          <div className="p-3 rounded-md border border-border/70 bg-card hover:shadow-md transition-shadow">
+            <p className="text-md font-semibold text-primary break-words">
+              {results.keywords.join(', ')}
+            </p>
           </div>
         </ScrollArea>
       </CardContent>

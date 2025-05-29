@@ -44,7 +44,7 @@ export default function HomePage() {
     <div className="min-h-screen flex flex-col">
       <AppHeader />
       <main className="flex-grow container mx-auto px-4 md:px-6 py-8 md:py-12">
-        <section className="max-w-6xl mx-auto"> {/* Increased max-width for side-by-side layout */}
+        <section className="max-w-6xl mx-auto">
           <div className="text-center mb-8 md:mb-12">
             <h2 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
               Unlock Your Content's Potential
@@ -54,12 +54,12 @@ export default function HomePage() {
             </p>
           </div>
           
-          <div className="grid md:grid-cols-2 gap-8 items-start">
-            <div className="bg-card p-6 sm:p-8 rounded-xl shadow-xl">
+          <div className="grid md:grid-cols-2 gap-8 items-stretch"> {/* Changed items-start to items-stretch */}
+            <div className="bg-card p-6 sm:p-8 rounded-xl shadow-xl h-full flex flex-col"> {/* Added h-full and flex flex-col */}
               <KeywordForm onSubmit={handleGenerateKeywords} isLoading={isLoading} />
             </div>
             
-            <div className="mt-8 md:mt-0"> {/* This div will be the second grid item */}
+            <div className="h-full flex flex-col"> {/* Added h-full and flex flex-col for the results container */}
               <KeywordResults results={results} isLoading={isLoading} error={error} />
             </div>
           </div>

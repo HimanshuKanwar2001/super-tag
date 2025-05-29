@@ -16,9 +16,9 @@ interface KeywordResultsProps {
   results: SuggestKeywordsOutput | null;
   isLoading: boolean;
   error: string | null;
-  remainingGenerations: number | null;
-  maxGenerations: number | null;
-  resetTime?: number;
+  remainingGenerations: number | null; // Can be null if not yet loaded from client storage
+  maxGenerations: number | null;     // Can be null if not yet loaded
+  resetTime?: number;               // Timestamp for next reset
 }
 
 export function KeywordResults({ 
@@ -34,6 +34,7 @@ export function KeywordResults({
 
   useEffect(() => {
     if (resetTime) {
+      // Ensure toLocaleTimeString is only called on client after mount
       setFormattedResetTimeForDisplay(new Date(resetTime).toLocaleTimeString());
     } else {
       setFormattedResetTimeForDisplay(null);
@@ -63,6 +64,10 @@ export function KeywordResults({
   };
 
   const renderUsageInfo = () => {
+    // Show skeleton if loading and data isn't available yet
+    if (isLoading && (remainingGenerations === null || maxGenerations === null)) {
+         return <Skeleton className="h-4 w-28" />;
+    }
     if (remainingGenerations !== null && maxGenerations !== null) {
       const isDepleted = remainingGenerations <= 0;
       return (
@@ -75,14 +80,11 @@ export function KeywordResults({
         </div>
       );
     }
-    if (isLoading && remainingGenerations === null) {
-         return <Skeleton className="h-4 w-28" />;
-    }
-    return null;
+    return null; // Return null if not loading and data is still null (e.g. initial state before effect runs)
   };
 
 
-  if (isLoading) {
+  if (isLoading && !results && !error) { // Show full card skeleton only if truly loading initial results
     return (
       <Card className="h-full flex flex-col shadow-xl rounded-xl">
         <CardHeader>
@@ -91,21 +93,19 @@ export function KeywordResults({
               <ListChecks className="mr-3 h-6 w-6 text-primary shrink-0" />
               Generating Keywords...
             </CardTitle>
-            {renderUsageInfo()}
+            {renderUsageInfo()} 
           </div>
         </CardHeader>
         <CardContent className="flex-grow space-y-4">
-          {[...Array(1)].map((_, i) => ( // Simulating one line of keywords being loaded
-            <Skeleton key={i} className="h-8 w-full" />
-          ))}
+           <Skeleton className="h-8 w-full" />
         </CardContent>
       </Card>
     );
   }
-
-  const localError = error && (!results || results.keywords.length === 0);
-
-  if (localError) {
+  
+  // Prioritize showing error if one exists, even if there are stale results or loading state is true
+  // (e.g. rate limit error from page.tsx before API call)
+  if (error && (!results || results.keywords.length === 0 || error.toLowerCase().includes("limit reached"))) {
     return (
       <Card className="h-full flex flex-col shadow-xl rounded-xl">
         <CardHeader>
@@ -130,7 +130,9 @@ export function KeywordResults({
     );
   }
   
-  if (!results || results.keywords.length === 0 && !error) {
+  if (!results || results.keywords.length === 0) {
+    // This state is for when there are no results and no overriding error,
+    // or if results are empty (e.g. AI returned no keywords)
     return (
       <Card className="h-full flex flex-col shadow-xl rounded-xl">
         <CardHeader>
@@ -157,6 +159,7 @@ export function KeywordResults({
     );
   }
 
+  // Display results if available
   return (
     <Card className="h-full flex flex-col shadow-xl rounded-xl">
       <CardHeader>
@@ -166,12 +169,12 @@ export function KeywordResults({
                 <ThumbsUp className="mr-3 h-7 w-7 text-primary shrink-0" />
                 Suggested Keywords
             </CardTitle>
-            {results && results.keywords.length === 0 && (
+            {results.keywords.length === 0 && ( // Should be caught by above block, but safe
                 <CardDescription className="mt-1">No keywords were generated for this input.</CardDescription>
             )}
             </div>
             <div className="flex flex-col items-end gap-2">
-                {results && results.keywords.length > 0 && (
+                {results.keywords.length > 0 && (
                 <Button onClick={handleCopyAllKeywords} variant="outline" size="sm" className="shrink-0">
                     <Copy className="mr-2 h-4 w-4" />
                     Copy All
@@ -182,7 +185,7 @@ export function KeywordResults({
         </div>
       </CardHeader>
       <CardContent className="flex-grow overflow-hidden">
-         {results && results.keywords.length > 0 ? (
+         {results.keywords.length > 0 ? (
             <ScrollArea className="h-full pr-4">
                 <div className="p-3 rounded-md border border-border/70 bg-background hover:shadow-md transition-shadow">
                 <p className="text-md font-semibold text-primary break-words">
@@ -191,10 +194,11 @@ export function KeywordResults({
                 </div>
             </ScrollArea>
          ) : (
+            // This specific inner empty state might be redundant now due to the outer one, but can serve as a fallback
             <div className="flex-grow flex flex-col items-center justify-center text-center p-6">
                 <Info className="mx-auto h-10 w-10 text-muted-foreground mb-3" />
                 <p className="text-md text-muted-foreground">
-                  Enter your content details and click "Suggest Keywords" to see results.
+                  No keywords were generated.
                 </p>
           </div>
          )}

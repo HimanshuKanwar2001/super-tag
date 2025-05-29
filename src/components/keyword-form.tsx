@@ -45,7 +45,7 @@ type KeywordFormValues = z.infer<typeof formSchema>;
 interface KeywordFormProps {
   onSubmit: (values: SuggestKeywordsInput) => Promise<void>;
   isLoading: boolean;
-  isDisabled?: boolean;
+  isDisabled?: boolean; // This prop will be controlled by isLoading OR isLimitReached from page.tsx
 }
 
 const inputMethodOptions = [
@@ -162,13 +162,13 @@ export function KeywordForm({ onSubmit, isLoading, isDisabled }: KeywordFormProp
           )}
         />
 
-        <Button type="submit" disabled={isLoading || isDisabled} className="w-full md:w-auto">
+        <Button type="submit" disabled={isDisabled || isLoading} className="w-full md:w-auto">
           {isLoading ? (
             <>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               Generating...
             </>
-          ) : isDisabled ? (
+          ) : isDisabled && !isLoading ? ( // Make sure not to show "Limit Reached" if it's just loading
              'Daily Limit Reached'
           ) : (
             'Suggest Keywords'

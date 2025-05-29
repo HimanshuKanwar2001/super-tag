@@ -2,47 +2,88 @@
 'use client';
 
 import type React from 'react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { KeywordForm } from '@/components/keyword-form';
 import { KeywordResults } from '@/components/keyword-results';
-import { getKeywordsAction, getInitialUsage } from './actions';
+import { getKeywordsAction } from './actions';
 import type { SuggestKeywordsInput, SuggestKeywordsOutput } from '@/ai/flows/suggest-keywords';
 import { useToast } from "@/hooks/use-toast";
 import { AlertCircle } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
+const CLIENT_MAX_GENERATIONS_PER_DAY = 5;
+const CLIENT_USAGE_STORAGE_KEY = 'keywordGeneratorUsage';
+const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+
+interface ClientUsageData {
+  count: number;
+  lastReset: number; // Timestamp of the last reset
+}
+
 export default function HomePage() {
   const [results, setResults] = useState<SuggestKeywordsOutput | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [remainingGenerations, setRemainingGenerations] = useState<number | null>(null);
-  const [maxGenerations, setMaxGenerations] = useState<number | null>(null);
+  
+  const [remainingGenerations, setRemainingGenerations] = useState<number>(CLIENT_MAX_GENERATIONS_PER_DAY);
+  const [maxGenerations, setMaxGenerations] = useState<number>(CLIENT_MAX_GENERATIONS_PER_DAY);
   const [resetTime, setResetTime] = useState<number | undefined>(undefined);
+  const [isLimitReached, setIsLimitReached] = useState(false);
   const [formattedResetTimeForAlert, setFormattedResetTimeForAlert] = useState<string | null>(null);
+  
   const { toast } = useToast();
 
-  useEffect(() => {
-    async function fetchInitialUsage() {
-      setIsLoading(true); // Indicate loading for initial usage fetch
-      try {
-        const usage = await getInitialUsage();
-        setRemainingGenerations(usage.remainingGenerations);
-        setMaxGenerations(usage.maxGenerations);
-        setResetTime(usage.resetTime);
-      } catch (e) {
-        console.error("Failed to fetch initial usage:", e);
-        toast({
-          variant: "destructive",
-          title: "Error",
-          description: "Could not fetch usage data. Please try refreshing.",
-        });
-        setRemainingGenerations(null); 
-        setMaxGenerations(null);
+  const loadUsageFromLocalStorage = useCallback(() => {
+    const now = Date.now();
+    try {
+      const storedData = localStorage.getItem(CLIENT_USAGE_STORAGE_KEY);
+      if (storedData) {
+        const usage: ClientUsageData = JSON.parse(storedData);
+        if (now < usage.lastReset + ONE_DAY_MS) {
+          // Still within the 24-hour window
+          setRemainingGenerations(usage.count);
+          setResetTime(usage.lastReset + ONE_DAY_MS);
+          setIsLimitReached(usage.count <= 0);
+        } else {
+          // 24-hour window has passed, reset
+          resetClientUsage();
+        }
+      } else {
+        // No data, initialize
+        resetClientUsage();
       }
-      setIsLoading(false);
+    } catch (e) {
+      console.error("Failed to load usage data from localStorage:", e);
+      // Fallback to default if localStorage is corrupt or inaccessible
+      resetClientUsage();
     }
-    fetchInitialUsage();
-  }, [toast]);
+    setMaxGenerations(CLIENT_MAX_GENERATIONS_PER_DAY);
+  }, []);
+
+  const resetClientUsage = () => {
+    const now = Date.now();
+    const newUsage: ClientUsageData = { count: CLIENT_MAX_GENERATIONS_PER_DAY, lastReset: now };
+    localStorage.setItem(CLIENT_USAGE_STORAGE_KEY, JSON.stringify(newUsage));
+    setRemainingGenerations(newUsage.count);
+    setResetTime(newUsage.lastReset + ONE_DAY_MS);
+    setIsLimitReached(newUsage.count <= 0);
+  };
+
+  const recordClientGeneration = () => {
+    const now = Date.now();
+    const newCount = remainingGenerations - 1;
+    // Ensure lastReset reflects the start of the current 24h cycle
+    // It should have been set correctly by loadUsageFromLocalStorage or resetClientUsage
+    const currentLastReset = resetTime ? resetTime - ONE_DAY_MS : now; 
+    const newUsage: ClientUsageData = { count: newCount, lastReset: currentLastReset };
+    localStorage.setItem(CLIENT_USAGE_STORAGE_KEY, JSON.stringify(newUsage));
+    setRemainingGenerations(newCount);
+    setIsLimitReached(newCount <= 0);
+  };
+
+  useEffect(() => {
+    loadUsageFromLocalStorage();
+  }, [loadUsageFromLocalStorage]);
 
   useEffect(() => {
     if (resetTime) {
@@ -53,42 +94,43 @@ export default function HomePage() {
   }, [resetTime]);
 
   const handleGenerateKeywords = async (values: SuggestKeywordsInput) => {
-    setIsLoading(true);
-    setError(null);
+    setError(null); // Clear previous errors
 
+    if (isLimitReached) {
+      const limitErrorMsg = `Daily limit of ${CLIENT_MAX_GENERATIONS_PER_DAY} generations reached. Please try again after ${formattedResetTimeForAlert || 'the reset time'}.`;
+      setError(limitErrorMsg);
+      toast({
+        variant: "destructive",
+        title: "Daily Limit Reached",
+        description: limitErrorMsg,
+      });
+      setIsLoading(false);
+      return;
+    }
+
+    setIsLoading(true);
+    
     const response = await getKeywordsAction(values);
 
     if (response.success) {
       setResults(response.data);
-      setRemainingGenerations(response.remainingGenerations);
-      setResetTime(response.resetTime);
+      recordClientGeneration(); // Record successful generation
       toast({
         title: "Keywords Generated!",
         description: "Successfully fetched keyword suggestions.",
       });
     } else {
       setError(response.error);
-      if (response.remainingGenerations !== undefined) {
-        setRemainingGenerations(response.remainingGenerations);
-      }
-      if (response.resetTime !== undefined) {
-        setResetTime(response.resetTime);
-      }
-      let toastDescription = response.error;
-      if (response.remainingGenerations === 0 && response.resetTime) {
-        // Make toast message more generic, rely on Alert for specific time
-        toastDescription += ` Please check the notice for when you can try again.`;
-      }
+      // Do not decrement count for failed server-side actions (e.g. validation error, AI error)
+      // Only decrement for successful generation or if limit was hit client-side *before* call.
       toast({
         variant: "destructive",
         title: "Error Generating Keywords",
-        description: toastDescription,
+        description: response.error,
       });
     }
     setIsLoading(false);
   };
-
-  const isLimitReached = remainingGenerations !== null && remainingGenerations <= 0;
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
@@ -102,11 +144,11 @@ export default function HomePage() {
               Get AI-powered keyword suggestions to rank higher and boost engagement for your Reels and Shorts.
             </p>
             <p className="mt-2 text-xs text-muted-foreground/80">
-              (Prototype Feature: Daily usage limit is per-IP and uses in-memory storage, which resets on server/deployment changes.)
+              (Prototype Feature: Daily usage limit is stored in your browser and resets every 24 hours.)
             </p>
           </div>
           
-          {isLimitReached && resetTime && formattedResetTimeForAlert && (
+          {isLimitReached && formattedResetTimeForAlert && (
             <Alert variant="destructive" className="mb-6">
               <AlertCircle className="h-4 w-4" />
               <AlertTitle>Daily Limit Reached</AlertTitle>
@@ -120,15 +162,15 @@ export default function HomePage() {
             <div className="bg-card p-6 sm:p-8 rounded-xl shadow-xl h-full flex flex-col">
               <KeywordForm 
                 onSubmit={handleGenerateKeywords} 
-                isLoading={isLoading && !results} 
-                isDisabled={isLimitReached} 
+                isLoading={isLoading && !results} // Show loading on form only if results aren't there yet
+                isDisabled={isLoading || isLimitReached} // Disable if loading or limit reached
               />
             </div>
             
             <div className="h-full flex flex-col">
               <KeywordResults 
                 results={results} 
-                isLoading={isLoading && (results === null)} 
+                isLoading={isLoading && (results === null)} // Show loading on results only if they are truly null
                 error={error} 
                 remainingGenerations={remainingGenerations}
                 maxGenerations={maxGenerations}

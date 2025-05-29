@@ -2,7 +2,7 @@
 'use client';
 
 import type React from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
@@ -43,7 +43,7 @@ export function KeywordResults({ results, isLoading, error }: KeywordResultsProp
 
   if (isLoading) {
     return (
-      <Card className="h-full flex flex-col">
+      <Card className="h-full flex flex-col shadow-xl rounded-xl">
         <CardHeader>
           <CardTitle className="flex items-center">
             <ListChecks className="mr-3 h-6 w-6 text-primary" />
@@ -55,7 +55,6 @@ export function KeywordResults({ results, isLoading, error }: KeywordResultsProp
             <div key={i} className="space-y-2">
               <Skeleton className="h-5 w-3/4" />
               <Skeleton className="h-4 w-full" />
-              <Skeleton className="h-4 w-5/6" />
             </div>
           ))}
         </CardContent>
@@ -65,7 +64,7 @@ export function KeywordResults({ results, isLoading, error }: KeywordResultsProp
 
   if (error) {
     return (
-      <Card className="h-full flex flex-col">
+      <Card className="h-full flex flex-col shadow-xl rounded-xl">
         <CardHeader>
           <CardTitle className="flex items-center text-destructive">
              <AlertCircle className="mr-3 h-6 w-6" />
@@ -85,7 +84,7 @@ export function KeywordResults({ results, isLoading, error }: KeywordResultsProp
 
   if (!results) {
     return (
-      <Card className="h-full flex flex-col">
+      <Card className="h-full flex flex-col shadow-xl rounded-xl">
         <CardHeader>
             <CardTitle className="flex items-center">
                 <ListChecks className="mr-3 h-6 w-6 text-primary" />
@@ -105,7 +104,7 @@ export function KeywordResults({ results, isLoading, error }: KeywordResultsProp
 
   if (results.keywords.length === 0) {
     return (
-      <Card className="h-full flex flex-col">
+      <Card className="h-full flex flex-col shadow-xl rounded-xl">
         <CardHeader>
            <CardTitle className="flex items-center">
                 <ListChecks className="mr-3 h-6 w-6 text-primary" />
@@ -141,13 +140,10 @@ export function KeywordResults({ results, isLoading, error }: KeywordResultsProp
       </CardHeader>
       <CardContent className="flex-grow overflow-hidden">
         <ScrollArea className="h-full pr-4"> {/* Added pr-4 for scrollbar spacing */}
-          <div className="space-y-4">
+          <div className="space-y-2"> {/* Reduced spacing between keywords */}
             {results.keywords.map((keyword, index) => (
-              <div key={index} className="p-4 rounded-md border border-border/70 bg-card hover:shadow-md transition-shadow">
-                <h4 className="text-md font-semibold text-primary mb-1 break-words">{keyword}</h4>
-                <p className="text-sm text-foreground/80 break-words">
-                  {results.keywordExplanations[index] || 'No explanation available.'}
-                </p>
+              <div key={index} className="p-3 rounded-md border border-border/70 bg-card hover:shadow-md transition-shadow"> {/* Reduced padding */}
+                <h4 className="text-md font-semibold text-primary break-words">{keyword}</h4>
               </div>
             ))}
           </div>

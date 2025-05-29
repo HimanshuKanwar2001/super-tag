@@ -23,9 +23,6 @@ const SuggestKeywordsOutputSchema = z.object({
   keywords: z
     .array(z.string())
     .describe('An array of SEO-relevant keywords for the video.'),
-  keywordExplanations: z
-    .array(z.string())
-    .describe('Explanations for each keyword, describing its suggested application.'),
 });
 export type SuggestKeywordsOutput = z.infer<typeof SuggestKeywordsOutputSchema>;
 
@@ -45,9 +42,9 @@ const prompt = ai.definePrompt({
   Input Text: {{{inputText}}}
   Platform: {{{platform}}}
 
-  Provide the keywords and an explanation for each keyword describing its suggested application.  Make sure that the keywords are relevant for the specified platform.
+  Make sure that the keywords are relevant for the specified platform.
 
-  Your output should be a JSON object with a "keywords" field containing an array of keywords, and a "keywordExplanations" field containing an array of explanations for each keyword.
+  Your output should be a JSON object with a "keywords" field containing an array of keywords.
   `,
 });
 

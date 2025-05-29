@@ -19,7 +19,7 @@ export async function getKeywordsAction(
 
   try {
     const result = await suggestKeywords(validationResult.data);
-    if (result && result.keywords && result.keywordExplanations) {
+    if (result && result.keywords) {
       return { success: true, data: result };
     } else {
       return { success: false, error: 'Failed to generate keywords. The AI returned an unexpected result.' };

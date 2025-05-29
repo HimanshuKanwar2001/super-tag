@@ -2,6 +2,7 @@
 'use client';
 
 import type React from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -29,6 +30,15 @@ export function KeywordResults({
   resetTime 
 }: KeywordResultsProps) {
   const { toast } = useToast();
+  const [formattedResetTimeForDisplay, setFormattedResetTimeForDisplay] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (resetTime) {
+      setFormattedResetTimeForDisplay(new Date(resetTime).toLocaleTimeString());
+    } else {
+      setFormattedResetTimeForDisplay(null);
+    }
+  }, [resetTime]);
 
   const handleCopyAllKeywords = () => {
     if (results && results.keywords.length > 0) {
@@ -59,13 +69,12 @@ export function KeywordResults({
         <div className={`text-xs ${isDepleted ? 'text-destructive' : 'text-muted-foreground'} flex items-center whitespace-nowrap`}>
           <Users className="mr-1.5 h-3.5 w-3.5 shrink-0" />
           Daily Usage: {remainingGenerations}/{maxGenerations}
-          {isDepleted && resetTime && (
-            <span className="ml-1 truncate"> (Resets: {new Date(resetTime).toLocaleTimeString()})</span>
+          {isDepleted && formattedResetTimeForDisplay && (
+            <span className="ml-1 truncate"> (Resets: {formattedResetTimeForDisplay})</span>
           )}
         </div>
       );
     }
-    // Render a placeholder while loading initial usage
     if (isLoading && remainingGenerations === null) {
          return <Skeleton className="h-4 w-28" />;
     }
@@ -86,7 +95,7 @@ export function KeywordResults({
           </div>
         </CardHeader>
         <CardContent className="flex-grow space-y-4">
-          {[...Array(1)].map((_, i) => (
+          {[...Array(1)].map((_, i) => ( // Simulating one line of keywords being loaded
             <Skeleton key={i} className="h-8 w-full" />
           ))}
         </CardContent>
@@ -94,8 +103,6 @@ export function KeywordResults({
     );
   }
 
-  // This error is specific to the results card if AI fails *after* rate limit passed
-  // Global rate limit error is handled by an Alert in page.tsx
   const localError = error && (!results || results.keywords.length === 0);
 
   if (localError) {
@@ -123,7 +130,7 @@ export function KeywordResults({
     );
   }
   
-  if (!results || results.keywords.length === 0 && !error) { // Show "No keywords yet" or "No keywords found"
+  if (!results || results.keywords.length === 0 && !error) {
     return (
       <Card className="h-full flex flex-col shadow-xl rounded-xl">
         <CardHeader>
@@ -150,7 +157,6 @@ export function KeywordResults({
     );
   }
 
-  // Display results if available
   return (
     <Card className="h-full flex flex-col shadow-xl rounded-xl">
       <CardHeader>
@@ -185,7 +191,6 @@ export function KeywordResults({
                 </div>
             </ScrollArea>
          ) : (
-            // This case should ideally be covered by the block above, but as a fallback:
             <div className="flex-grow flex flex-col items-center justify-center text-center p-6">
                 <Info className="mx-auto h-10 w-10 text-muted-foreground mb-3" />
                 <p className="text-md text-muted-foreground">

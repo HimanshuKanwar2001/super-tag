@@ -18,6 +18,7 @@ export default function HomePage() {
   const [remainingGenerations, setRemainingGenerations] = useState<number | null>(null);
   const [maxGenerations, setMaxGenerations] = useState<number | null>(null);
   const [resetTime, setResetTime] = useState<number | undefined>(undefined);
+  const [formattedResetTimeForAlert, setFormattedResetTimeForAlert] = useState<string | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -35,7 +36,6 @@ export default function HomePage() {
           title: "Error",
           description: "Could not fetch usage data. Please try refreshing.",
         });
-        // Set to a state where the app might still be usable but without limits shown
         setRemainingGenerations(null); 
         setMaxGenerations(null);
       }
@@ -44,10 +44,17 @@ export default function HomePage() {
     fetchInitialUsage();
   }, [toast]);
 
+  useEffect(() => {
+    if (resetTime) {
+      setFormattedResetTimeForAlert(new Date(resetTime).toLocaleTimeString());
+    } else {
+      setFormattedResetTimeForAlert(null);
+    }
+  }, [resetTime]);
+
   const handleGenerateKeywords = async (values: SuggestKeywordsInput) => {
     setIsLoading(true);
     setError(null);
-    // Optionally clear previous results: setResults(null);
 
     const response = await getKeywordsAction(values);
 
@@ -69,7 +76,8 @@ export default function HomePage() {
       }
       let toastDescription = response.error;
       if (response.remainingGenerations === 0 && response.resetTime) {
-        toastDescription += ` Try again after ${new Date(response.resetTime).toLocaleTimeString()}.`;
+        // Make toast message more generic, rely on Alert for specific time
+        toastDescription += ` Please check the notice for when you can try again.`;
       }
       toast({
         variant: "destructive",
@@ -98,12 +106,12 @@ export default function HomePage() {
             </p>
           </div>
           
-          {isLimitReached && resetTime && (
+          {isLimitReached && resetTime && formattedResetTimeForAlert && (
             <Alert variant="destructive" className="mb-6">
               <AlertCircle className="h-4 w-4" />
               <AlertTitle>Daily Limit Reached</AlertTitle>
               <AlertDescription>
-                You have used all your keyword generations for today. Please try again after {new Date(resetTime).toLocaleTimeString()}.
+                You have used all your keyword generations for today. Please try again after {formattedResetTimeForAlert}.
               </AlertDescription>
             </Alert>
           )}
@@ -112,7 +120,7 @@ export default function HomePage() {
             <div className="bg-card p-6 sm:p-8 rounded-xl shadow-xl h-full flex flex-col">
               <KeywordForm 
                 onSubmit={handleGenerateKeywords} 
-                isLoading={isLoading && !results} // Show loading in form only if initial load or no results yet
+                isLoading={isLoading && !results} 
                 isDisabled={isLimitReached} 
               />
             </div>
@@ -120,7 +128,7 @@ export default function HomePage() {
             <div className="h-full flex flex-col">
               <KeywordResults 
                 results={results} 
-                isLoading={isLoading && (results === null)} // Show loading in results only on very first load
+                isLoading={isLoading && (results === null)} 
                 error={error} 
                 remainingGenerations={remainingGenerations}
                 maxGenerations={maxGenerations}

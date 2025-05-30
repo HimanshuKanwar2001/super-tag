@@ -5,17 +5,20 @@ import type React from 'react';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { KeywordForm } from '@/components/keyword-form';
 import { KeywordResults } from '@/components/keyword-results';
-import { getKeywordsAction, logAnalyticsEvent } from './actions';
+import { getKeywordsAction, logAnalyticsEvent, saveContactDetailsAction } from './actions';
 import type { SuggestKeywordsInput, SuggestKeywordsOutput } from '@/ai/flows/suggest-keywords';
 import { useToast } from "@/hooks/use-toast";
 import { LimitReachedPopup } from '@/components/limit-reached-popup';
+import { SubscribeForm, type SubscribeFormValues } from '@/components/subscribe-form';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { Separator } from '@/components/ui/separator';
 
 const CLIENT_MAX_GENERATIONS_PER_DAY = 5;
 const CLIENT_USAGE_STORAGE_KEY = 'keywordGeneratorUsage';
 const REFERRAL_CODE_STORAGE_KEY = 'referralCodeData';
 const REFERRAL_CODE_EXPIRY_DAYS = 30;
 const COMMUNITY_URL_PLACEHOLDER = 'https://example.com/community'; // Remember to replace this!
+const PRIVACY_POLICY_URL_PLACEHOLDER = '/privacy-policy'; // Remember to replace this!
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 
 interface ClientUsageData {
@@ -31,6 +34,7 @@ interface ReferralCodeData {
 export default function HomePage() {
   const [results, setResults] = useState<SuggestKeywordsOutput | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isSubmittingContact, setIsSubmittingContact] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
   const [remainingGenerations, setRemainingGenerations] = useState<number>(CLIENT_MAX_GENERATIONS_PER_DAY);
@@ -84,12 +88,10 @@ export default function HomePage() {
       localStorage.setItem(REFERRAL_CODE_STORAGE_KEY, JSON.stringify(newReferralData));
       activeReferralCode = urlReferralCode;
       console.log(`Referral code "${urlReferralCode}" from URL stored/updated. Expires: ${new Date(newReferralData.expiresAt).toLocaleDateString()}`);
-      // Optionally log referral code applied event
       logAnalyticsEvent({
-        eventType: 'keyword_generation_attempt', // This is a generic event, consider a specific "referral_code_applied"
+        eventType: 'referral_code_applied', 
         referralCode: activeReferralCode,
         isMobile: isMobile,
-        // Add other relevant fields if needed, e.g. source: 'url'
       }).catch(console.error);
       // Optionally clean URL: window.history.replaceState({}, document.title, window.location.pathname);
     } else {
@@ -112,7 +114,7 @@ export default function HomePage() {
     }
     setStoredReferralCode(activeReferralCode);
 
-  }, [isMobile]); // Added isMobile to dependency array for logAnalyticsEvent
+  }, [isMobile]); 
 
   const resetClientUsage = () => {
     const now = Date.now();
@@ -145,7 +147,7 @@ export default function HomePage() {
     const limitReachedAfterGeneration = newCount <= 0;
     setIsLimitReached(limitReachedAfterGeneration);
     console.log("Generation recorded. Remaining:", newCount, "Limit reached:", limitReachedAfterGeneration);
-    return limitReachedAfterGeneration; // Return if limit was reached by this generation
+    return limitReachedAfterGeneration; 
   };
 
   useEffect(() => {
@@ -170,7 +172,6 @@ export default function HomePage() {
         setIsLimitPopupOpen(true);
         setIsLoading(false); 
         console.log("Attempted generation, but limit reached.");
-        // Log analytics event for already limited attempt
         logAnalyticsEvent({
             eventType: 'already_limited_attempt',
             inputMethod: values.inputMethod,
@@ -182,6 +183,16 @@ export default function HomePage() {
         }).catch(console.error);
         return;
     }
+    
+    logAnalyticsEvent({
+        eventType: 'keyword_generation_attempt',
+        inputMethod: values.inputMethod,
+        platform: values.platform,
+        inputTextLength: values.inputText.length,
+        referralCode: storedReferralCode,
+        wasAlreadyLimited: false,
+        isMobile: isMobile,
+    }).catch(console.error);
     
     const response = await getKeywordsAction(values);
     let dailyLimitReachedThisAttempt = false;
@@ -201,7 +212,7 @@ export default function HomePage() {
         numberOfKeywordsGenerated: response.data.keywords.length,
         referralCode: storedReferralCode,
         dailyLimitReachedThisAttempt: dailyLimitReachedThisAttempt,
-        wasAlreadyLimited: false, // Since we passed the initial check
+        wasAlreadyLimited: false, 
         isMobile: isMobile,
       }).catch(console.error);
     } else {
@@ -224,7 +235,6 @@ export default function HomePage() {
     }
     setIsLoading(false);
 
-    // If the limit was specifically reached by *this* generation, open the popup
     if (dailyLimitReachedThisAttempt) {
         setIsLimitPopupOpen(true);
         logAnalyticsEvent({
@@ -239,6 +249,31 @@ export default function HomePage() {
         }).catch(console.error);
     }
   };
+
+  const handleSubscribe = async (values: SubscribeFormValues) => {
+    setIsSubmittingContact(true);
+    const response = await saveContactDetailsAction(values);
+    if (response.success) {
+      toast({
+        title: "Subscribed!",
+        description: "Thanks for subscribing. We'll keep you updated.",
+      });
+      // Optionally log this to your general analytics if desired,
+      // but PII itself is handled separately by saveContactDetailsAction.
+      logAnalyticsEvent({
+        eventType: 'contact_details_submitted', // Make sure this eventType is handled in your GSheet setup if you add it
+        isMobile: isMobile,
+        referralCode: storedReferralCode
+      }).catch(console.error);
+    } else {
+      toast({
+        variant: "destructive",
+        title: "Subscription Failed",
+        description: response.error || "Could not save your details. Please try again.",
+      });
+    }
+    setIsSubmittingContact(false);
+  };
   
 
   return (
@@ -246,9 +281,9 @@ export default function HomePage() {
       <main className="flex-grow container mx-auto px-4 md:px-6 py-8 md:py-12">
         <section className="max-w-6xl mx-auto">
           <div className="text-center mb-8 md:mb-12">
-            <h2 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
+            <h1 className="text-4xl font-bold tracking-tight text-foreground sm:text-5xl">
               Unlock Your Content's Potential
-            </h2>
+            </h1>
             <p className="mt-3 text-lg text-muted-foreground">
               Get powerful keyword suggestions, identified from thousands of trending Reels and Shorts, to rank higher and boost engagement.
             </p>
@@ -277,6 +312,27 @@ export default function HomePage() {
             </div>
           </div>
         </section>
+
+        <Separator className="my-12 md:my-16" />
+
+        <section className="max-w-2xl mx-auto">
+            <div className="text-center mb-8">
+                <h2 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
+                    Stay Updated!
+                </h2>
+                <p className="mt-3 text-lg text-muted-foreground">
+                    Subscribe to get the latest tips, feature updates, and exclusive content directly to your inbox.
+                </p>
+            </div>
+            <div className="bg-card p-6 sm:p-8 rounded-xl shadow-xl">
+                <SubscribeForm 
+                    onSubmit={handleSubscribe} 
+                    isLoading={isSubmittingContact}
+                    privacyPolicyUrl={PRIVACY_POLICY_URL_PLACEHOLDER}
+                />
+            </div>
+        </section>
+
       </main>
       <LimitReachedPopup
         isOpen={isLimitPopupOpen}

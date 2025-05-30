@@ -108,7 +108,7 @@ export function LimitReachedPopup({
 
   return (
     <AlertDialog open={isOpen} onOpenChange={(openState) => { if (!openState) onClose(); }}>
-      <AlertDialogContent className="max-w-md w-full p-6 rounded-xl shadow-2xl">
+      <AlertDialogContent className="max-w-lg w-full p-6 rounded-xl shadow-2xl">
         <AlertDialogHeader className="mb-2">
           <AlertDialogTitle className="text-2xl font-bold text-center text-foreground">
             Daily Limit Reached

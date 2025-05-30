@@ -103,12 +103,12 @@ export function LimitReachedPopup({
           </div>
         </div>
 
-        <AlertDialogFooter className="flex flex-col gap-3 pt-4">
+        <AlertDialogFooter className="flex flex-col sm:flex-row sm:justify-end gap-3 sm:gap-2 pt-4">
           <Button
             variant="default"
             size="lg"
             onClick={() => window.open(unlockUrl, '_blank')}
-            className="w-full bg-primary text-primary-foreground hover:bg-primary/90 transition-colors duration-150 ease-in-out"
+            className="w-full sm:w-auto bg-primary text-primary-foreground hover:bg-primary/90 transition-colors duration-150 ease-in-out"
           >
             <ExternalLink className="mr-2 h-5 w-5" />
             Unlock Unlimited
@@ -117,12 +117,12 @@ export function LimitReachedPopup({
             variant="outline"
             size="lg"
             onClick={() => window.open(communityUrl, '_blank')}
-            className="w-full border-primary text-primary hover:bg-primary/10 transition-colors duration-150 ease-in-out"
+            className="w-full sm:w-auto border-primary text-primary hover:bg-primary/10 transition-colors duration-150 ease-in-out"
           >
             <Users className="mr-2 h-5 w-5" />
             Access the Community
           </Button>
-          <Button variant="ghost" size="lg" onClick={onClose} className="w-full text-muted-foreground hover:bg-muted transition-colors duration-150 ease-in-out">
+          <Button variant="ghost" size="lg" onClick={onClose} className="w-full sm:w-auto text-muted-foreground hover:bg-muted transition-colors duration-150 ease-in-out">
             <X className="mr-2 h-5 w-5" />
             Close
           </Button>

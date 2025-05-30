@@ -8,13 +8,13 @@ import { KeywordResults } from '@/components/keyword-results';
 import { getKeywordsAction } from './actions';
 import type { SuggestKeywordsInput, SuggestKeywordsOutput } from '@/ai/flows/suggest-keywords';
 import { useToast } from "@/hooks/use-toast";
-import { LimitReachedPopup } from '@/components/limit-reached-popup'; // New import
+import { LimitReachedPopup } from '@/components/limit-reached-popup';
 
 const CLIENT_MAX_GENERATIONS_PER_DAY = 5;
 const CLIENT_USAGE_STORAGE_KEY = 'keywordGeneratorUsage';
-const REFERRAL_CODE_STORAGE_KEY = 'referralCodeData'; // Updated key
+const REFERRAL_CODE_STORAGE_KEY = 'referralCodeData';
 const REFERRAL_CODE_EXPIRY_DAYS = 30;
-const COMMUNITY_URL_PLACEHOLDER = 'https://example.com/community'; // Placeholder
+const COMMUNITY_URL_PLACEHOLDER = 'https://example.com/community';
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 
 interface ClientUsageData {
@@ -35,7 +35,7 @@ export default function HomePage() {
   const [remainingGenerations, setRemainingGenerations] = useState<number>(CLIENT_MAX_GENERATIONS_PER_DAY);
   const [maxGenerations, setMaxGenerations] = useState<number>(CLIENT_MAX_GENERATIONS_PER_DAY);
   const [resetTime, setResetTime] = useState<number | undefined>(undefined);
-  const [isLimitReached, setIsLimitReached] = useState(false);
+  const [isLimitReached, setIsLimitReached] = useState(false); // Still useful for UI cues if needed elsewhere, though not for disabling form
   
   const [isLimitPopupOpen, setIsLimitPopupOpen] = useState(false);
   const [storedReferralCode, setStoredReferralCode] = useState<string | null>(null);
@@ -53,11 +53,7 @@ export default function HomePage() {
         if (now < usage.lastReset + ONE_DAY_MS) {
           setRemainingGenerations(usage.count);
           setResetTime(usage.lastReset + ONE_DAY_MS);
-          const limitReached = usage.count <= 0;
-          setIsLimitReached(limitReached);
-          if (limitReached && !isLimitPopupOpen) { // Open popup if limit reached on load
-            // setIsLimitPopupOpen(true); // This might be too aggressive on page load, let's trigger on action
-          }
+          setIsLimitReached(usage.count <= 0);
         } else {
           resetClientUsage();
         }
@@ -83,8 +79,7 @@ export default function HomePage() {
       localStorage.setItem(REFERRAL_CODE_STORAGE_KEY, JSON.stringify(newReferralData));
       activeReferralCode = urlReferralCode;
       console.log(`Referral code "${urlReferralCode}" from URL stored/updated. Expires: ${new Date(newReferralData.expiresAt).toLocaleDateString()}`);
-      // Clean URL to prevent re-processing on refresh, optional
-      // window.history.replaceState({}, document.title, window.location.pathname);
+      // Optionally clean URL: window.history.replaceState({}, document.title, window.location.pathname);
     } else {
       const storedReferralString = localStorage.getItem(REFERRAL_CODE_STORAGE_KEY);
       if (storedReferralString) {
@@ -105,7 +100,7 @@ export default function HomePage() {
     }
     setStoredReferralCode(activeReferralCode);
 
-  }, [isLimitPopupOpen]); // Added isLimitPopupOpen to dependencies, though it might not be strictly needed here.
+  }, []);
 
   const resetClientUsage = () => {
     const now = Date.now();
@@ -114,21 +109,19 @@ export default function HomePage() {
     setRemainingGenerations(newUsage.count);
     setResetTime(newUsage.lastReset + ONE_DAY_MS);
     setIsLimitReached(newUsage.count <= 0);
-    setIsLimitPopupOpen(false); // Close popup on reset
+    setIsLimitPopupOpen(false);
   };
 
   const recordClientGeneration = () => {
     const now = Date.now();
-    const newCount = Math.max(0, remainingGenerations - 1); // Ensure count doesn't go below 0
+    const newCount = Math.max(0, remainingGenerations - 1);
     const currentLastReset = resetTime ? resetTime - ONE_DAY_MS : now; 
     const newUsage: ClientUsageData = { count: newCount, lastReset: currentLastReset };
     localStorage.setItem(CLIENT_USAGE_STORAGE_KEY, JSON.stringify(newUsage));
     setRemainingGenerations(newCount);
-    const limitReached = newCount <= 0;
-    setIsLimitReached(limitReached);
-    if (limitReached) {
-      setIsLimitPopupOpen(true);
-    }
+    const limitReachedAfterGeneration = newCount <= 0;
+    setIsLimitReached(limitReachedAfterGeneration);
+    // Don't automatically open popup here, handleGenerateKeywords does it if attempted again
   };
 
   useEffect(() => {
@@ -140,17 +133,13 @@ export default function HomePage() {
     setError(null); 
 
     // Check limit *before* API call
-    if (remainingGenerations <= 0) { // Re-check here in case state is stale
-        setIsLimitReached(true); // Ensure state is accurate
+    // This check happens AFTER user clicks the button
+    if (remainingGenerations <= 0) {
+        setIsLimitReached(true); 
         setIsLimitPopupOpen(true);
-        setError(`Daily limit of ${CLIENT_MAX_GENERATIONS_PER_DAY} generations reached.`);
-        // Toast is optional here as popup is more prominent
-        // toast({
-        //   variant: "destructive",
-        //   title: "Daily Limit Reached",
-        //   description: `Please try again after ${resetTime ? new Date(resetTime).toLocaleTimeString() : 'the reset time'}.`,
-        // });
-        setIsLoading(false);
+        // setError might be useful for KeywordResults display if desired
+        // setError(`Daily limit of ${CLIENT_MAX_GENERATIONS_PER_DAY} generations reached.`); 
+        setIsLoading(false); // Ensure loading is false if we bail out here
         return;
     }
 
@@ -176,13 +165,6 @@ export default function HomePage() {
     setIsLoading(false);
   };
   
-  // Effect to open popup if limit is reached and component is aware
-  useEffect(() => {
-    if (isLimitReached && resetTime && Date.now() < resetTime) {
-       // setIsLimitPopupOpen(true); // This can be triggered here or on action. Let's prefer triggering on action.
-    }
-  }, [isLimitReached, resetTime]);
-
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
@@ -200,21 +182,18 @@ export default function HomePage() {
             </p>
           </div>
           
-          {/* Removed old Alert for limit reached */}
-
           <div className="grid md:grid-cols-2 gap-8 items-stretch">
             <div className="bg-card p-6 sm:p-8 rounded-xl shadow-xl h-full flex flex-col">
               <KeywordForm 
                 onSubmit={handleGenerateKeywords} 
-                isLoading={isLoading && !results} 
-                isDisabled={isLoading || isLimitReached} 
+                isLoading={isLoading} // Form is disabled only when isLoading is true
               />
             </div>
             
             <div className="h-full flex flex-col">
               <KeywordResults 
                 results={results} 
-                isLoading={isLoading && (results === null)} 
+                isLoading={isLoading && (results === null)} // Results loading skeleton
                 error={error} 
                 remainingGenerations={remainingGenerations}
                 maxGenerations={maxGenerations}

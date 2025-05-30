@@ -44,8 +44,7 @@ type KeywordFormValues = z.infer<typeof formSchema>;
 
 interface KeywordFormProps {
   onSubmit: (values: SuggestKeywordsInput) => Promise<void>;
-  isLoading: boolean;
-  isDisabled?: boolean; // This prop will be controlled by isLoading OR isLimitReached from page.tsx
+  isLoading: boolean; // True when the form submission is in progress
 }
 
 const inputMethodOptions = [
@@ -61,7 +60,7 @@ const platformOptions = [
   { value: 'linkedin video', label: 'LinkedIn Video', icon: <Linkedin className="mr-2 h-4 w-4" /> },
 ];
 
-export function KeywordForm({ onSubmit, isLoading, isDisabled }: KeywordFormProps) {
+export function KeywordForm({ onSubmit, isLoading }: KeywordFormProps) {
   const form = useForm<KeywordFormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -83,7 +82,7 @@ export function KeywordForm({ onSubmit, isLoading, isDisabled }: KeywordFormProp
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Input Method</FormLabel>
-                <Select onValueChange={field.onChange} defaultValue={field.value} disabled={isDisabled || isLoading}>
+                <Select onValueChange={field.onChange} defaultValue={field.value} disabled={isLoading}>
                   <FormControl>
                     <SelectTrigger>
                       <SelectValue placeholder="Select an input method" />
@@ -114,7 +113,7 @@ export function KeywordForm({ onSubmit, isLoading, isDisabled }: KeywordFormProp
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Platform</FormLabel>
-                <Select onValueChange={field.onChange} defaultValue={field.value} disabled={isDisabled || isLoading}>
+                <Select onValueChange={field.onChange} defaultValue={field.value} disabled={isLoading}>
                   <FormControl>
                     <SelectTrigger>
                       <SelectValue placeholder="Select a platform" />
@@ -151,7 +150,7 @@ export function KeywordForm({ onSubmit, isLoading, isDisabled }: KeywordFormProp
                   placeholder="Enter your caption, script, or title here..."
                   className="min-h-[150px] resize-y"
                   {...field}
-                  disabled={isDisabled || isLoading}
+                  disabled={isLoading}
                 />
               </FormControl>
               <FormDescription>
@@ -162,14 +161,12 @@ export function KeywordForm({ onSubmit, isLoading, isDisabled }: KeywordFormProp
           )}
         />
 
-        <Button type="submit" disabled={isDisabled || isLoading} className="w-full md:w-auto">
+        <Button type="submit" disabled={isLoading} className="w-full md:w-auto">
           {isLoading ? (
             <>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               Generating...
             </>
-          ) : isDisabled && !isLoading ? ( // Make sure not to show "Limit Reached" if it's just loading
-             'Daily Limit Reached'
           ) : (
             'Suggest Keywords'
           )}

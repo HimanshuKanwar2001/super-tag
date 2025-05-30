@@ -5,7 +5,7 @@ import type React from 'react';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { KeywordForm } from '@/components/keyword-form';
 import { KeywordResults } from '@/components/keyword-results';
-import { getKeywordsAction } from './actions';
+import { getKeywordsAction, logAnalyticsEvent } from './actions';
 import type { SuggestKeywordsInput, SuggestKeywordsOutput } from '@/ai/flows/suggest-keywords';
 import { useToast } from "@/hooks/use-toast";
 import { LimitReachedPopup } from '@/components/limit-reached-popup';
@@ -58,18 +58,16 @@ export default function HomePage() {
           setResetTime(usage.lastReset + ONE_DAY_MS);
           setIsLimitReached(usage.count <= 0);
         } else {
-          // If 24 hours have passed, reset usage
           console.log("Daily limit period expired, resetting usage.");
           resetClientUsage();
         }
       } else {
-        // No usage data found, initialize it
         console.log("No usage data found, initializing.");
         resetClientUsage();
       }
     } catch (e) {
       console.error("Failed to load usage data from localStorage:", e);
-      resetClientUsage(); // Reset to a known state on error
+      resetClientUsage(); 
     }
     setMaxGenerations(CLIENT_MAX_GENERATIONS_PER_DAY);
 
@@ -86,6 +84,13 @@ export default function HomePage() {
       localStorage.setItem(REFERRAL_CODE_STORAGE_KEY, JSON.stringify(newReferralData));
       activeReferralCode = urlReferralCode;
       console.log(`Referral code "${urlReferralCode}" from URL stored/updated. Expires: ${new Date(newReferralData.expiresAt).toLocaleDateString()}`);
+      // Optionally log referral code applied event
+      logAnalyticsEvent({
+        eventType: 'keyword_generation_attempt', // This is a generic event, consider a specific "referral_code_applied"
+        referralCode: activeReferralCode,
+        isMobile: isMobile,
+        // Add other relevant fields if needed, e.g. source: 'url'
+      }).catch(console.error);
       // Optionally clean URL: window.history.replaceState({}, document.title, window.location.pathname);
     } else {
       const storedReferralString = localStorage.getItem(REFERRAL_CODE_STORAGE_KEY);
@@ -107,7 +112,7 @@ export default function HomePage() {
     }
     setStoredReferralCode(activeReferralCode);
 
-  }, []);
+  }, [isMobile]); // Added isMobile to dependency array for logAnalyticsEvent
 
   const resetClientUsage = () => {
     const now = Date.now();
@@ -116,20 +121,19 @@ export default function HomePage() {
     setRemainingGenerations(newUsage.count);
     setResetTime(newUsage.lastReset + ONE_DAY_MS);
     setIsLimitReached(newUsage.count <= 0);
-    setIsLimitPopupOpen(false); // Close popup if it was open due to limit
+    setIsLimitPopupOpen(false); 
     console.log("Client usage reset. Generations remaining:", newUsage.count);
   };
 
   const recordClientGeneration = () => {
     const now = Date.now();
     const newCount = Math.max(0, remainingGenerations - 1);
-    // Ensure lastReset is from the current cycle, not potentially a future resetTime
     const storedUsage = localStorage.getItem(CLIENT_USAGE_STORAGE_KEY);
-    let currentLastReset = now; // Default to now if no prior reset time found
+    let currentLastReset = now; 
     if (storedUsage) {
         try {
             const usage: ClientUsageData = JSON.parse(storedUsage);
-            currentLastReset = usage.lastReset; // Use the stored last reset time
+            currentLastReset = usage.lastReset; 
         } catch (e) {
             console.error("Error reading stored usage for recording generation:", e);
         }
@@ -141,6 +145,7 @@ export default function HomePage() {
     const limitReachedAfterGeneration = newCount <= 0;
     setIsLimitReached(limitReachedAfterGeneration);
     console.log("Generation recorded. Remaining:", newCount, "Limit reached:", limitReachedAfterGeneration);
+    return limitReachedAfterGeneration; // Return if limit was reached by this generation
   };
 
   useEffect(() => {
@@ -150,32 +155,55 @@ export default function HomePage() {
 
   const handleGenerateKeywords = async (values: SuggestKeywordsInput) => {
     setError(null); 
-    setResults(null); // Clear previous results
+    setResults(null); 
 
     setIsLoading(true);
 
     if (isMobile && resultsContainerRef.current) {
       resultsContainerRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
+    
+    const wasAlreadyLimited = remainingGenerations <= 0;
 
-    // Check limit *after* setting loading and potentially scrolling, but before API call
-    if (remainingGenerations <= 0) {
+    if (wasAlreadyLimited) {
         setIsLimitReached(true); 
         setIsLimitPopupOpen(true);
         setIsLoading(false); 
         console.log("Attempted generation, but limit reached.");
+        // Log analytics event for already limited attempt
+        logAnalyticsEvent({
+            eventType: 'already_limited_attempt',
+            inputMethod: values.inputMethod,
+            platform: values.platform,
+            inputTextLength: values.inputText.length,
+            referralCode: storedReferralCode,
+            wasAlreadyLimited: true,
+            isMobile: isMobile,
+        }).catch(console.error);
         return;
     }
     
     const response = await getKeywordsAction(values);
+    let dailyLimitReachedThisAttempt = false;
 
     if (response.success) {
       setResults(response.data);
-      recordClientGeneration(); 
+      dailyLimitReachedThisAttempt = recordClientGeneration(); 
       toast({
         title: "Keywords Generated!",
         description: "Successfully fetched keyword suggestions.",
       });
+      logAnalyticsEvent({
+        eventType: 'keyword_generation_success',
+        inputMethod: values.inputMethod,
+        platform: values.platform,
+        inputTextLength: values.inputText.length,
+        numberOfKeywordsGenerated: response.data.keywords.length,
+        referralCode: storedReferralCode,
+        dailyLimitReachedThisAttempt: dailyLimitReachedThisAttempt,
+        wasAlreadyLimited: false, // Since we passed the initial check
+        isMobile: isMobile,
+      }).catch(console.error);
     } else {
       setError(response.error);
       toast({
@@ -183,8 +211,33 @@ export default function HomePage() {
         title: "Error Generating Keywords",
         description: response.error,
       });
+       logAnalyticsEvent({
+        eventType: 'keyword_generation_failure',
+        inputMethod: values.inputMethod,
+        platform: values.platform,
+        inputTextLength: values.inputText.length,
+        referralCode: storedReferralCode,
+        wasAlreadyLimited: false,
+        isMobile: isMobile,
+        errorMessage: response.error,
+      }).catch(console.error);
     }
     setIsLoading(false);
+
+    // If the limit was specifically reached by *this* generation, open the popup
+    if (dailyLimitReachedThisAttempt) {
+        setIsLimitPopupOpen(true);
+        logAnalyticsEvent({
+          eventType: 'limit_hit_on_attempt',
+          inputMethod: values.inputMethod,
+          platform: values.platform,
+          inputTextLength: values.inputText.length,
+          referralCode: storedReferralCode,
+          dailyLimitReachedThisAttempt: true,
+          wasAlreadyLimited: false,
+          isMobile: isMobile,
+        }).catch(console.error);
+    }
   };
   
 

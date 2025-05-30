@@ -5,9 +5,8 @@ import type React from 'react';
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
-import { ThumbsUp, AlertCircle, Info, Copy, ListChecks, Users } from 'lucide-react';
+import { ThumbsUp, AlertCircle, Info, Copy, ListChecks, Users, Brain, Loader2, Sparkles } from 'lucide-react';
 import type { SuggestKeywordsOutput } from '@/ai/flows/suggest-keywords';
 import { useToast } from "@/hooks/use-toast";
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -16,9 +15,9 @@ interface KeywordResultsProps {
   results: SuggestKeywordsOutput | null;
   isLoading: boolean;
   error: string | null;
-  remainingGenerations: number | null; // Can be null if not yet loaded from client storage
-  maxGenerations: number | null;     // Can be null if not yet loaded
-  resetTime?: number;               // Timestamp for next reset
+  remainingGenerations: number | null; 
+  maxGenerations: number | null;     
+  resetTime?: number;               
 }
 
 export function KeywordResults({ 
@@ -34,7 +33,6 @@ export function KeywordResults({
 
   useEffect(() => {
     if (resetTime) {
-      // Ensure toLocaleTimeString is only called on client after mount
       setFormattedResetTimeForDisplay(new Date(resetTime).toLocaleTimeString());
     } else {
       setFormattedResetTimeForDisplay(null);
@@ -64,9 +62,8 @@ export function KeywordResults({
   };
 
   const renderUsageInfo = () => {
-    // Show skeleton if loading and data isn't available yet
     if (isLoading && (remainingGenerations === null || maxGenerations === null)) {
-         return <Skeleton className="h-4 w-28" />;
+        return <div className="h-4 w-28 bg-muted rounded animate-pulse" />; // Skeleton for usage info
     }
     if (remainingGenerations !== null && maxGenerations !== null) {
       const isDepleted = remainingGenerations <= 0;
@@ -80,32 +77,40 @@ export function KeywordResults({
         </div>
       );
     }
-    return null; // Return null if not loading and data is still null (e.g. initial state before effect runs)
+    return null; 
   };
 
 
-  if (isLoading && !results && !error) { // Show full card skeleton only if truly loading initial results
+  if (isLoading && !results && !error) { 
     return (
       <Card className="h-full flex flex-col shadow-xl rounded-xl">
         <CardHeader>
           <div className="flex justify-between items-start gap-2">
             <CardTitle className="flex items-center">
-              <ListChecks className="mr-3 h-6 w-6 text-primary shrink-0" />
+              <Sparkles className="mr-3 h-6 w-6 text-primary shrink-0 animate-pulse" />
               Generating Keywords...
             </CardTitle>
             {renderUsageInfo()} 
           </div>
         </CardHeader>
-        <CardContent className="flex-grow space-y-4">
-           <Skeleton className="h-8 w-full" />
+        <CardContent className="flex-grow flex flex-col items-center justify-center text-center p-6 sm:p-10 space-y-3">
+           <Brain className="h-12 w-12 sm:h-16 sm:w-16 text-primary opacity-80" />
+            <p className="text-lg sm:text-xl font-semibold text-foreground">
+              Our AI is working its magic!
+            </p>
+            <p className="text-sm text-muted-foreground max-w-xs">
+              Analyzing your input, researching trends, and crafting the perfect keywords just for you.
+            </p>
+            <Loader2 className="h-6 w-6 sm:h-8 sm:w-8 text-muted-foreground animate-spin mt-3" />
+            <p className="text-xs text-muted-foreground/80">
+              This might take a moment...
+            </p>
         </CardContent>
       </Card>
     );
   }
   
-  // Prioritize showing error if one exists, even if there are stale results or loading state is true
-  // (e.g. rate limit error from page.tsx before API call)
-  if (error && (!results || results.keywords.length === 0 || error.toLowerCase().includes("limit reached"))) {
+  if (error && (!results || results.keywords.length === 0 || error.toLowerCase().includes("limit reached") || error.toLowerCase().includes("daily limit"))) {
     return (
       <Card className="h-full flex flex-col shadow-xl rounded-xl">
         <CardHeader>
@@ -117,7 +122,7 @@ export function KeywordResults({
             {renderUsageInfo()}
           </div>
         </CardHeader>
-        <CardContent className="flex-grow flex items-center justify-center">
+        <CardContent className="flex-grow flex items-center justify-center p-6">
           <Alert variant="destructive" className="w-full">
             <AlertCircle className="h-4 w-4" />
             <AlertTitle>Generation Failed</AlertTitle>
@@ -131,8 +136,6 @@ export function KeywordResults({
   }
   
   if (!results || results.keywords.length === 0) {
-    // This state is for when there are no results and no overriding error,
-    // or if results are empty (e.g. AI returned no keywords)
     return (
       <Card className="h-full flex flex-col shadow-xl rounded-xl">
         <CardHeader>
@@ -159,7 +162,6 @@ export function KeywordResults({
     );
   }
 
-  // Display results if available
   return (
     <Card className="h-full flex flex-col shadow-xl rounded-xl">
       <CardHeader>
@@ -169,7 +171,7 @@ export function KeywordResults({
                 <ThumbsUp className="mr-3 h-7 w-7 text-primary shrink-0" />
                 Suggested Keywords
             </CardTitle>
-            {results.keywords.length === 0 && ( // Should be caught by above block, but safe
+            {results.keywords.length === 0 && ( 
                 <CardDescription className="mt-1">No keywords were generated for this input.</CardDescription>
             )}
             </div>
@@ -186,15 +188,14 @@ export function KeywordResults({
       </CardHeader>
       <CardContent className="flex-grow overflow-hidden">
          {results.keywords.length > 0 ? (
-            <ScrollArea className="h-full pr-4">
+            <ScrollArea className="h-full pr-4"> {/* Ensure ScrollArea takes full height if content overflows */}
                 <div className="p-3 rounded-md border border-border/70 bg-background hover:shadow-md transition-shadow">
-                <p className="text-md font-semibold text-primary break-words">
-                    {results.keywords.join(', ')}
-                </p>
+                  <p className="text-md font-semibold text-primary break-words">
+                      {results.keywords.join(', ')}
+                  </p>
                 </div>
             </ScrollArea>
          ) : (
-            // This specific inner empty state might be redundant now due to the outer one, but can serve as a fallback
             <div className="flex-grow flex flex-col items-center justify-center text-center p-6">
                 <Info className="mx-auto h-10 w-10 text-muted-foreground mb-3" />
                 <p className="text-md text-muted-foreground">

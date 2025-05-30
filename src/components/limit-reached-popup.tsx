@@ -103,7 +103,7 @@ export function LimitReachedPopup({
           </div>
         </div>
 
-        <AlertDialogFooter className="flex flex-col sm:flex-col gap-3 pt-4">
+        <AlertDialogFooter className="flex flex-col gap-3 pt-4">
           <Button
             variant="default"
             size="lg"

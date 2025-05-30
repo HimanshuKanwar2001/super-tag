@@ -35,7 +35,7 @@ export default function HomePage() {
   const [remainingGenerations, setRemainingGenerations] = useState<number>(CLIENT_MAX_GENERATIONS_PER_DAY);
   const [maxGenerations, setMaxGenerations] = useState<number>(CLIENT_MAX_GENERATIONS_PER_DAY);
   const [resetTime, setResetTime] = useState<number | undefined>(undefined);
-  const [isLimitReached, setIsLimitReached] = useState(false); // Still useful for UI cues if needed elsewhere, though not for disabling form
+  const [isLimitReached, setIsLimitReached] = useState(false); 
   
   const [isLimitPopupOpen, setIsLimitPopupOpen] = useState(false);
   const [storedReferralCode, setStoredReferralCode] = useState<string | null>(null);
@@ -121,7 +121,6 @@ export default function HomePage() {
     setRemainingGenerations(newCount);
     const limitReachedAfterGeneration = newCount <= 0;
     setIsLimitReached(limitReachedAfterGeneration);
-    // Don't automatically open popup here, handleGenerateKeywords does it if attempted again
   };
 
   useEffect(() => {
@@ -132,14 +131,10 @@ export default function HomePage() {
   const handleGenerateKeywords = async (values: SuggestKeywordsInput) => {
     setError(null); 
 
-    // Check limit *before* API call
-    // This check happens AFTER user clicks the button
     if (remainingGenerations <= 0) {
         setIsLimitReached(true); 
         setIsLimitPopupOpen(true);
-        // setError might be useful for KeywordResults display if desired
-        // setError(`Daily limit of ${CLIENT_MAX_GENERATIONS_PER_DAY} generations reached.`); 
-        setIsLoading(false); // Ensure loading is false if we bail out here
+        setIsLoading(false); 
         return;
     }
 
@@ -175,7 +170,7 @@ export default function HomePage() {
               Unlock Your Content's Potential
             </h2>
             <p className="mt-3 text-lg text-muted-foreground">
-              Get AI-powered keyword suggestions to rank higher and boost engagement for your Reels and Shorts.
+              Get powerful keyword suggestions, identified from thousands of trending Reels and Shorts, to rank higher and boost engagement.
             </p>
             <p className="mt-2 text-xs text-muted-foreground/80">
               (Daily usage limit of {CLIENT_MAX_GENERATIONS_PER_DAY} generations is stored in your browser and resets every 24 hours.)
@@ -186,14 +181,14 @@ export default function HomePage() {
             <div className="bg-card p-6 sm:p-8 rounded-xl shadow-xl h-full flex flex-col">
               <KeywordForm 
                 onSubmit={handleGenerateKeywords} 
-                isLoading={isLoading} // Form is disabled only when isLoading is true
+                isLoading={isLoading}
               />
             </div>
             
             <div className="h-full flex flex-col">
               <KeywordResults 
                 results={results} 
-                isLoading={isLoading && (results === null)} // Results loading skeleton
+                isLoading={isLoading && (results === null)} 
                 error={error} 
                 remainingGenerations={remainingGenerations}
                 maxGenerations={maxGenerations}
@@ -208,7 +203,7 @@ export default function HomePage() {
         onClose={() => setIsLimitPopupOpen(false)}
         resetTime={resetTime}
         referralCode={storedReferralCode}
-        communityUrl={COMMUNITY_URL_PLACEHOLDER}
+        communityUrl={COMMUNITY_URL_PLACEHOLDER} 
       />
     </div>
   );

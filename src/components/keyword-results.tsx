@@ -6,7 +6,7 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
-import { ThumbsUp, AlertCircle, Info, Copy, ListChecks, Users, Brain, Loader2, Sparkles } from 'lucide-react';
+import { ThumbsUp, AlertCircle, Info, Copy, ListChecks, Users, Brain, Loader2, Sparkles, SearchCheck } from 'lucide-react';
 import type { SuggestKeywordsOutput } from '@/ai/flows/suggest-keywords';
 import { useToast } from "@/hooks/use-toast";
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -33,7 +33,8 @@ export function KeywordResults({
 
   useEffect(() => {
     if (resetTime) {
-      setFormattedResetTimeForDisplay(new Date(resetTime).toLocaleTimeString());
+      const date = new Date(resetTime);
+      setFormattedResetTimeForDisplay(date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
     } else {
       setFormattedResetTimeForDisplay(null);
     }
@@ -63,7 +64,7 @@ export function KeywordResults({
 
   const renderUsageInfo = () => {
     if (isLoading && (remainingGenerations === null || maxGenerations === null)) {
-        return <div className="h-4 w-28 bg-muted rounded animate-pulse" />; // Skeleton for usage info
+        return <div className="h-4 w-28 bg-muted rounded animate-pulse" />; 
     }
     if (remainingGenerations !== null && maxGenerations !== null) {
       const isDepleted = remainingGenerations <= 0;
@@ -87,8 +88,8 @@ export function KeywordResults({
         <CardHeader>
           <div className="flex justify-between items-start gap-2">
             <CardTitle className="flex items-center">
-              <Sparkles className="mr-3 h-6 w-6 text-primary shrink-0 animate-pulse" />
-              Generating Keywords...
+              <SearchCheck className="mr-3 h-6 w-6 text-primary shrink-0 animate-pulse" />
+              Finding Your Keywords...
             </CardTitle>
             {renderUsageInfo()} 
           </div>
@@ -96,10 +97,10 @@ export function KeywordResults({
         <CardContent className="flex-grow flex flex-col items-center justify-center text-center p-6 sm:p-10 space-y-3">
            <Brain className="h-12 w-12 sm:h-16 sm:w-16 text-primary opacity-80" />
             <p className="text-lg sm:text-xl font-semibold text-foreground">
-              Our AI is working its magic!
+              Our system is hard at work!
             </p>
             <p className="text-sm text-muted-foreground max-w-xs">
-              Analyzing your input, researching trends, and crafting the perfect keywords just for you.
+              Analyzing your input, scanning thousands of successful videos, and identifying top-performing keywords for you.
             </p>
             <Loader2 className="h-6 w-6 sm:h-8 sm:w-8 text-muted-foreground animate-spin mt-3" />
             <p className="text-xs text-muted-foreground/80">
@@ -188,7 +189,7 @@ export function KeywordResults({
       </CardHeader>
       <CardContent className="flex-grow overflow-hidden">
          {results.keywords.length > 0 ? (
-            <ScrollArea className="h-full pr-4"> {/* Ensure ScrollArea takes full height if content overflows */}
+            <ScrollArea className="h-full pr-4"> 
                 <div className="p-3 rounded-md border border-border/70 bg-background hover:shadow-md transition-shadow">
                   <p className="text-md font-semibold text-primary break-words">
                       {results.keywords.join(', ')}

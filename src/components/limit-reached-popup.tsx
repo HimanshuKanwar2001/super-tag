@@ -54,12 +54,10 @@ export function LimitReachedPopup({
 
   useEffect(() => {
     if (!resetTime || !isOpen) {
-      // Ensure timer doesn't run if resetTime is undefined or popup is closed
-      setTimeLeft(calculateTimeLeft(resetTime)); // Recalculate if resetTime changes while closed
+      setTimeLeft(calculateTimeLeft(resetTime)); 
       return;
     }
 
-    // Initialize immediately
     setTimeLeft(calculateTimeLeft(resetTime));
 
     const timer = setInterval(() => {
@@ -67,8 +65,7 @@ export function LimitReachedPopup({
       setTimeLeft(newTimeLeft);
       if (newTimeLeft.total <= 0) {
         clearInterval(timer);
-        onClose(); // Auto-close when time is up
-        // Consider a mechanism to re-fetch usage or prompt user to refresh
+        onClose(); 
       }
     }, 1000);
 
@@ -103,26 +100,33 @@ export function LimitReachedPopup({
           </div>
         </div>
 
-        <AlertDialogFooter className="flex flex-col sm:flex-row sm:justify-end gap-3 sm:gap-2 pt-4">
-          <Button
-            variant="default"
-            size="lg"
-            onClick={() => window.open(unlockUrl, '_blank')}
-            className="w-full sm:w-auto bg-primary text-primary-foreground hover:bg-primary/90 transition-colors duration-150 ease-in-out"
+        <AlertDialogFooter className="flex items-center justify-between pt-6">
+          <div className="flex items-center gap-3">
+            <Button
+              variant="default"
+              size="lg"
+              onClick={() => window.open(unlockUrl, '_blank')}
+              className="bg-primary text-primary-foreground hover:bg-primary/90 transition-colors duration-150 ease-in-out"
+            >
+              <ExternalLink className="mr-2 h-5 w-5" />
+              Unlock Unlimited
+            </Button>
+            <Button
+              variant="outline"
+              size="lg"
+              onClick={() => window.open(communityUrl, '_blank')}
+              className="border-primary text-primary hover:bg-primary/10 transition-colors duration-150 ease-in-out"
+            >
+              <Users className="mr-2 h-5 w-5" />
+              Access the Community
+            </Button>
+          </div>
+          <Button 
+            variant="ghost" 
+            size="lg" 
+            onClick={onClose} 
+            className="text-muted-foreground hover:bg-muted transition-colors duration-150 ease-in-out"
           >
-            <ExternalLink className="mr-2 h-5 w-5" />
-            Unlock Unlimited
-          </Button>
-          <Button
-            variant="outline"
-            size="lg"
-            onClick={() => window.open(communityUrl, '_blank')}
-            className="w-full sm:w-auto border-primary text-primary hover:bg-primary/10 transition-colors duration-150 ease-in-out"
-          >
-            <Users className="mr-2 h-5 w-5" />
-            Access the Community
-          </Button>
-          <Button variant="ghost" size="lg" onClick={onClose} className="w-full sm:w-auto text-muted-foreground hover:bg-muted transition-colors duration-150 ease-in-out">
             <X className="mr-2 h-5 w-5" />
             Close
           </Button>

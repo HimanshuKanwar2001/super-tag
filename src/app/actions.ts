@@ -14,15 +14,15 @@ const KeywordActionInputSchema = z.object({
 export async function getKeywordsAction(
   data: SuggestKeywordsInput
 ): Promise<
-  { success: true; data: SuggestKeywordsOutput } | 
+  { success: true; data: SuggestKeywordsOutput } |
   { success: false; error: string }
 > {
-  try { 
+  try {
     const validationResult = KeywordActionInputSchema.safeParse(data);
     if (!validationResult.success) {
       const errorMessage = validationResult.error.errors.map(e => e.message).join(', ');
       logAnalyticsEvent({
-        eventType: 'keyword_generation_failure', 
+        eventType: 'keyword_generation_failure',
         inputMethod: data.inputMethod,
         platform: data.platform,
         inputTextLength: data.inputText?.length || 0,
@@ -30,25 +30,25 @@ export async function getKeywordsAction(
       }).catch(err => {
         console.error("Failed to log validation_failure event:", err);
       });
-      return { 
-        success: false, 
+      return {
+        success: false,
         error: errorMessage
       };
     }
 
     const result = await suggestKeywords(validationResult.data);
     if (result && result.keywords) {
-      return { 
-        success: true, 
+      return {
+        success: true,
         data: result
       };
     } else {
-      return { 
-        success: false, 
+      return {
+        success: false,
         error: 'Failed to generate keywords. The AI returned an unexpected result.'
       };
     }
-  } catch (e: any) { 
+  } catch (e: any) {
     console.error("Outer unhandled error in getKeywordsAction:", e);
     let errorMessage = 'An unexpected error occurred while generating keywords.';
     if (e instanceof Error) {
@@ -85,26 +85,33 @@ export async function saveContactDetailsAction(
 
     const { email, phone } = validationResult.data;
 
-    // **IMPORTANT: PII Handling**
-    // Logging PII (email, phone) to a general analytics Google Sheet is NOT recommended
-    // due to privacy and security concerns.
-    // For a production application, store this information in a secure database (e.g., Firestore)
-    // or a separate, highly access-controlled Google Sheet specifically for contact details.
-    // Ensure you have proper consent and a privacy policy in place.
+    // Log to Google Sheets
+    await logAnalyticsEvent({
+      eventType: 'contact_details_submitted',
+      email: email,
+      phone: phone || '', // Ensure phone is a string, even if empty
+      // Add any other relevant analytics data here, e.g., referralCode if available client-side
+    });
 
-    console.log('Contact Details Submitted:');
+    console.log('Contact Details Submitted & Logged:');
     console.log('Email:', email);
     if (phone) {
       console.log('Phone:', phone);
     }
-    console.log('Reminder: Store PII securely and in compliance with privacy regulations.');
+    console.log('Reminder: PII (email, phone) is now being sent to your analytics Google Sheet.');
+    console.log('For production, consider a separate, secure datastore for PII.');
 
-    // If you were to send to a *separate, secure* Google Sheet for contacts:
-    // await writeToSecureContactSheet({ timestamp: new Date().toISOString(), email, phone });
 
     return { success: true };
   } catch (error: any) {
     console.error('Error in saveContactDetailsAction:', error);
+    // Optionally, log this failure to analytics as well, but without PII
+    logAnalyticsEvent({
+      eventType: 'keyword_generation_failure', // Re-using this, or create a new 'contact_submission_failure'
+      errorMessage: `Error in saveContactDetailsAction: ${error.message || 'Unknown error'}`,
+    }).catch(err => {
+      console.error("Failed to log contact_submission_failure event:", err);
+    });
     return { success: false, error: 'An unexpected server error occurred while saving your details.' };
   }
 }
@@ -123,6 +130,8 @@ interface AnalyticsEventData {
   wasAlreadyLimited?: boolean;
   isMobile?: boolean;
   errorMessage?: string;
+  email?: string; // New field for email
+  phone?: string; // New field for phone
 }
 
 /**
@@ -158,9 +167,8 @@ export async function logAnalyticsEvent(eventData: Omit<AnalyticsEventData, 'tim
 
     const sheets = google.sheets({ version: 'v4', auth });
     const spreadsheetId = process.env.GOOGLE_SPREADSHEET_ID;
-    // Assumes your sheet is named "Sheet1" and you want to append to the first 11 columns (A to K)
-    // Update this range if your sheet structure or number of columns changes.
-    const range = 'Sheet1!A:K'; 
+    // Updated range to include new columns for email and phone (A to M for 13 columns)
+    const range = 'Sheet1!A:M';
 
     const values = [[
       completeEventData.timestamp,
@@ -174,12 +182,14 @@ export async function logAnalyticsEvent(eventData: Omit<AnalyticsEventData, 'tim
       completeEventData.wasAlreadyLimited !== undefined ? completeEventData.wasAlreadyLimited : '',
       completeEventData.isMobile !== undefined ? completeEventData.isMobile : '',
       completeEventData.errorMessage || '',
+      completeEventData.email || '', // New: Email
+      completeEventData.phone || '', // New: Phone
     ]];
 
     await sheets.spreadsheets.values.append({
       spreadsheetId,
       range,
-      valueInputOption: 'USER_ENTERED', 
+      valueInputOption: 'USER_ENTERED',
       requestBody: {
         values,
       },
@@ -188,7 +198,6 @@ export async function logAnalyticsEvent(eventData: Omit<AnalyticsEventData, 'tim
 
   } catch (error: any) {
     console.error('Error during Google Sheets API interaction in logAnalyticsEvent:', error);
-    // Log more details from the error object if available
     if (error.response && error.response.data && error.response.data.error) {
       console.error('Google API Error Details:', JSON.stringify(error.response.data.error, null, 2));
     }

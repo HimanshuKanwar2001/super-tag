@@ -258,12 +258,15 @@ export default function HomePage() {
         title: "Subscribed!",
         description: "Thanks for subscribing. We'll keep you updated.",
       });
-      // Optionally log this to your general analytics if desired,
-      // but PII itself is handled separately by saveContactDetailsAction.
+      // Log this event to general analytics, including the PII
+      // Note: The server action `saveContactDetailsAction` now handles the PII logging
+      // We still log a general event from the client here if needed for client-side tracking.
       logAnalyticsEvent({
-        eventType: 'contact_details_submitted', // Make sure this eventType is handled in your GSheet setup if you add it
+        eventType: 'contact_details_submitted',
         isMobile: isMobile,
-        referralCode: storedReferralCode
+        referralCode: storedReferralCode,
+        email: values.email, // Pass email to logAnalyticsEvent
+        phone: values.phone || '' // Pass phone to logAnalyticsEvent
       }).catch(console.error);
     } else {
       toast({

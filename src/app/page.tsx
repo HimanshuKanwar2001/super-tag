@@ -2,19 +2,20 @@
 'use client';
 
 import type React from 'react';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { KeywordForm } from '@/components/keyword-form';
 import { KeywordResults } from '@/components/keyword-results';
 import { getKeywordsAction } from './actions';
 import type { SuggestKeywordsInput, SuggestKeywordsOutput } from '@/ai/flows/suggest-keywords';
 import { useToast } from "@/hooks/use-toast";
 import { LimitReachedPopup } from '@/components/limit-reached-popup';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 const CLIENT_MAX_GENERATIONS_PER_DAY = 5;
 const CLIENT_USAGE_STORAGE_KEY = 'keywordGeneratorUsage';
 const REFERRAL_CODE_STORAGE_KEY = 'referralCodeData';
 const REFERRAL_CODE_EXPIRY_DAYS = 30;
-const COMMUNITY_URL_PLACEHOLDER = 'https://example.com/community';
+const COMMUNITY_URL_PLACEHOLDER = 'https://example.com/community'; // Remember to replace this!
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 
 interface ClientUsageData {
@@ -41,6 +42,8 @@ export default function HomePage() {
   const [storedReferralCode, setStoredReferralCode] = useState<string | null>(null);
   
   const { toast } = useToast();
+  const isMobile = useIsMobile();
+  const resultsContainerRef = useRef<HTMLDivElement>(null);
 
   const loadDataFromLocalStorage = useCallback(() => {
     const now = Date.now();
@@ -55,14 +58,18 @@ export default function HomePage() {
           setResetTime(usage.lastReset + ONE_DAY_MS);
           setIsLimitReached(usage.count <= 0);
         } else {
+          // If 24 hours have passed, reset usage
+          console.log("Daily limit period expired, resetting usage.");
           resetClientUsage();
         }
       } else {
+        // No usage data found, initialize it
+        console.log("No usage data found, initializing.");
         resetClientUsage();
       }
     } catch (e) {
       console.error("Failed to load usage data from localStorage:", e);
-      resetClientUsage();
+      resetClientUsage(); // Reset to a known state on error
     }
     setMaxGenerations(CLIENT_MAX_GENERATIONS_PER_DAY);
 
@@ -109,18 +116,31 @@ export default function HomePage() {
     setRemainingGenerations(newUsage.count);
     setResetTime(newUsage.lastReset + ONE_DAY_MS);
     setIsLimitReached(newUsage.count <= 0);
-    setIsLimitPopupOpen(false);
+    setIsLimitPopupOpen(false); // Close popup if it was open due to limit
+    console.log("Client usage reset. Generations remaining:", newUsage.count);
   };
 
   const recordClientGeneration = () => {
     const now = Date.now();
     const newCount = Math.max(0, remainingGenerations - 1);
-    const currentLastReset = resetTime ? resetTime - ONE_DAY_MS : now; 
+    // Ensure lastReset is from the current cycle, not potentially a future resetTime
+    const storedUsage = localStorage.getItem(CLIENT_USAGE_STORAGE_KEY);
+    let currentLastReset = now; // Default to now if no prior reset time found
+    if (storedUsage) {
+        try {
+            const usage: ClientUsageData = JSON.parse(storedUsage);
+            currentLastReset = usage.lastReset; // Use the stored last reset time
+        } catch (e) {
+            console.error("Error reading stored usage for recording generation:", e);
+        }
+    }
+    
     const newUsage: ClientUsageData = { count: newCount, lastReset: currentLastReset };
     localStorage.setItem(CLIENT_USAGE_STORAGE_KEY, JSON.stringify(newUsage));
     setRemainingGenerations(newCount);
     const limitReachedAfterGeneration = newCount <= 0;
     setIsLimitReached(limitReachedAfterGeneration);
+    console.log("Generation recorded. Remaining:", newCount, "Limit reached:", limitReachedAfterGeneration);
   };
 
   useEffect(() => {
@@ -130,15 +150,22 @@ export default function HomePage() {
 
   const handleGenerateKeywords = async (values: SuggestKeywordsInput) => {
     setError(null); 
+    setResults(null); // Clear previous results
 
+    setIsLoading(true);
+
+    if (isMobile && resultsContainerRef.current) {
+      resultsContainerRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    // Check limit *after* setting loading and potentially scrolling, but before API call
     if (remainingGenerations <= 0) {
         setIsLimitReached(true); 
         setIsLimitPopupOpen(true);
         setIsLoading(false); 
+        console.log("Attempted generation, but limit reached.");
         return;
     }
-
-    setIsLoading(true);
     
     const response = await getKeywordsAction(values);
 
@@ -185,7 +212,7 @@ export default function HomePage() {
               />
             </div>
             
-            <div className="h-full flex flex-col">
+            <div ref={resultsContainerRef} className="h-full flex flex-col">
               <KeywordResults 
                 results={results} 
                 isLoading={isLoading && (results === null)} 

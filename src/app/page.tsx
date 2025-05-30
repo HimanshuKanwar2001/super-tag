@@ -13,16 +13,18 @@ import { SubscribeForm, type SubscribeFormValues } from '@/components/subscribe-
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Separator } from '@/components/ui/separator';
 
-const CLIENT_MAX_GENERATIONS_PER_DAY = 5;
+const CLIENT_MAX_GENERATIONS_PER_DAY_BASE = 5;
+const BONUS_GENERATIONS = 15;
 const CLIENT_USAGE_STORAGE_KEY = 'keywordGeneratorUsage';
 const REFERRAL_CODE_STORAGE_KEY = 'referralCodeData';
+const EMAIL_BONUS_STORAGE_KEY = 'keywordGeneratorEmailBonusData'; // New key for bonus tracking
 const REFERRAL_CODE_EXPIRY_DAYS = 30;
 const COMMUNITY_URL_PLACEHOLDER = 'https://example.com/community'; // Remember to replace this!
 const PRIVACY_POLICY_URL_PLACEHOLDER = '/privacy-policy'; // Remember to replace this!
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 
 interface ClientUsageData {
-  count: number;
+  count: number; // Remaining generations
   lastReset: number; // Timestamp of the last reset
 }
 
@@ -31,49 +33,100 @@ interface ReferralCodeData {
   expiresAt: number; // Timestamp
 }
 
+interface EmailBonusData {
+  grantedInCycleTimestamp: number | null; // Timestamp of the usage.lastReset when bonus was granted
+}
+
 export default function HomePage() {
   const [results, setResults] = useState<SuggestKeywordsOutput | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isSubmittingContact, setIsSubmittingContact] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
-  const [remainingGenerations, setRemainingGenerations] = useState<number>(CLIENT_MAX_GENERATIONS_PER_DAY);
-  const [maxGenerations, setMaxGenerations] = useState<number>(CLIENT_MAX_GENERATIONS_PER_DAY);
+  const [remainingGenerations, setRemainingGenerations] = useState<number>(CLIENT_MAX_GENERATIONS_PER_DAY_BASE);
+  const [maxGenerations, setMaxGenerations] = useState<number>(CLIENT_MAX_GENERATIONS_PER_DAY_BASE);
   const [resetTime, setResetTime] = useState<number | undefined>(undefined);
-  const [isLimitReached, setIsLimitReached] = useState(false); 
+  const [isLimitReachedPopupOpen, setIsLimitReachedPopupOpen] = useState(false); 
   
-  const [isLimitPopupOpen, setIsLimitPopupOpen] = useState(false);
   const [storedReferralCode, setStoredReferralCode] = useState<string | null>(null);
+
+  const [isSubmittingEmailForBonus, setIsSubmittingEmailForBonus] = useState(false);
+  const [emailForBonusError, setEmailForBonusError] = useState<string | null>(null);
   
   const { toast } = useToast();
   const isMobile = useIsMobile();
   const resultsContainerRef = useRef<HTMLDivElement>(null);
 
+  const resetClientUsage = useCallback(() => {
+    const now = Date.now();
+    const newUsage: ClientUsageData = { count: CLIENT_MAX_GENERATIONS_PER_DAY_BASE, lastReset: now };
+    localStorage.setItem(CLIENT_USAGE_STORAGE_KEY, JSON.stringify(newUsage));
+    setRemainingGenerations(newUsage.count);
+    setMaxGenerations(CLIENT_MAX_GENERATIONS_PER_DAY_BASE);
+    setResetTime(newUsage.lastReset + ONE_DAY_MS);
+    
+    const newBonusData: EmailBonusData = { grantedInCycleTimestamp: null };
+    localStorage.setItem(EMAIL_BONUS_STORAGE_KEY, JSON.stringify(newBonusData));
+    
+    setIsLimitReachedPopupOpen(false); 
+    console.log("Client usage and bonus eligibility reset. Base generations remaining:", newUsage.count);
+  }, []);
+
+
   const loadDataFromLocalStorage = useCallback(() => {
     const now = Date.now();
+    let currentMaxGenerations = CLIENT_MAX_GENERATIONS_PER_DAY_BASE;
+    let currentRemainingGenerations = CLIENT_MAX_GENERATIONS_PER_DAY_BASE;
+    let currentResetTime = now + ONE_DAY_MS;
 
     // Load Usage Data
     try {
-      const storedUsage = localStorage.getItem(CLIENT_USAGE_STORAGE_KEY);
-      if (storedUsage) {
-        const usage: ClientUsageData = JSON.parse(storedUsage);
-        if (now < usage.lastReset + ONE_DAY_MS) {
-          setRemainingGenerations(usage.count);
-          setResetTime(usage.lastReset + ONE_DAY_MS);
-          setIsLimitReached(usage.count <= 0);
-        } else {
+      const storedUsageString = localStorage.getItem(CLIENT_USAGE_STORAGE_KEY);
+      let usage: ClientUsageData;
+
+      if (storedUsageString) {
+        usage = JSON.parse(storedUsageString);
+        if (now < usage.lastReset + ONE_DAY_MS) { // Current cycle active
+          currentRemainingGenerations = usage.count;
+          currentResetTime = usage.lastReset + ONE_DAY_MS;
+
+          // Check for bonus in this active cycle
+          const storedBonusString = localStorage.getItem(EMAIL_BONUS_STORAGE_KEY);
+          if (storedBonusString) {
+            const bonusData: EmailBonusData = JSON.parse(storedBonusString);
+            if (bonusData.grantedInCycleTimestamp === usage.lastReset) {
+              currentMaxGenerations = CLIENT_MAX_GENERATIONS_PER_DAY_BASE + BONUS_GENERATIONS;
+            }
+          }
+        } else { // Cycle expired
           console.log("Daily limit period expired, resetting usage.");
-          resetClientUsage();
+          resetClientUsage(); // This will set initial states
+          // After resetClientUsage, values are set, so we can return early or let the below setters run with reset values.
+          // For clarity, we'll let the state setters at the end handle it based on fresh reset values.
+          // Re-fetch fresh values after reset.
+          const freshUsageString = localStorage.getItem(CLIENT_USAGE_STORAGE_KEY);
+          usage = freshUsageString ? JSON.parse(freshUsageString) : { count: CLIENT_MAX_GENERATIONS_PER_DAY_BASE, lastReset: now};
+          currentRemainingGenerations = usage.count;
+          currentResetTime = usage.lastReset + ONE_DAY_MS;
+          currentMaxGenerations = CLIENT_MAX_GENERATIONS_PER_DAY_BASE;
         }
-      } else {
+      } else { // No usage data, initialize
         console.log("No usage data found, initializing.");
         resetClientUsage();
+        const freshUsageString = localStorage.getItem(CLIENT_USAGE_STORAGE_KEY);
+        usage = freshUsageString ? JSON.parse(freshUsageString) : { count: CLIENT_MAX_GENERATIONS_PER_DAY_BASE, lastReset: now};
+        currentRemainingGenerations = usage.count;
+        currentResetTime = usage.lastReset + ONE_DAY_MS;
+        currentMaxGenerations = CLIENT_MAX_GENERATIONS_PER_DAY_BASE;
       }
+      setRemainingGenerations(currentRemainingGenerations);
+      setMaxGenerations(currentMaxGenerations);
+      setResetTime(currentResetTime);
+
     } catch (e) {
       console.error("Failed to load usage data from localStorage:", e);
       resetClientUsage(); 
     }
-    setMaxGenerations(CLIENT_MAX_GENERATIONS_PER_DAY);
 
     // Load/Update Referral Code
     const queryParams = new URLSearchParams(window.location.search);
@@ -87,13 +140,11 @@ export default function HomePage() {
       };
       localStorage.setItem(REFERRAL_CODE_STORAGE_KEY, JSON.stringify(newReferralData));
       activeReferralCode = urlReferralCode;
-      console.log(`Referral code "${urlReferralCode}" from URL stored/updated. Expires: ${new Date(newReferralData.expiresAt).toLocaleDateString()}`);
       logAnalyticsEvent({
         eventType: 'referral_code_applied', 
         referralCode: activeReferralCode,
         isMobile: isMobile,
       }).catch(console.error);
-      // Optionally clean URL: window.history.replaceState({}, document.title, window.location.pathname);
     } else {
       const storedReferralString = localStorage.getItem(REFERRAL_CODE_STORAGE_KEY);
       if (storedReferralString) {
@@ -101,58 +152,41 @@ export default function HomePage() {
           const storedData: ReferralCodeData = JSON.parse(storedReferralString);
           if (now < storedData.expiresAt) {
             activeReferralCode = storedData.code;
-            console.log(`Using stored referral code "${activeReferralCode}". Expires: ${new Date(storedData.expiresAt).toLocaleDateString()}`);
           } else {
-            console.log("Stored referral code has expired.");
             localStorage.removeItem(REFERRAL_CODE_STORAGE_KEY);
           }
         } catch (e) {
-          console.error("Error parsing stored referral data:", e);
           localStorage.removeItem(REFERRAL_CODE_STORAGE_KEY);
         }
       }
     }
     setStoredReferralCode(activeReferralCode);
 
-  }, [isMobile]); 
-
-  const resetClientUsage = () => {
-    const now = Date.now();
-    const newUsage: ClientUsageData = { count: CLIENT_MAX_GENERATIONS_PER_DAY, lastReset: now };
-    localStorage.setItem(CLIENT_USAGE_STORAGE_KEY, JSON.stringify(newUsage));
-    setRemainingGenerations(newUsage.count);
-    setResetTime(newUsage.lastReset + ONE_DAY_MS);
-    setIsLimitReached(newUsage.count <= 0);
-    setIsLimitPopupOpen(false); 
-    console.log("Client usage reset. Generations remaining:", newUsage.count);
-  };
-
-  const recordClientGeneration = () => {
-    const now = Date.now();
-    const newCount = Math.max(0, remainingGenerations - 1);
-    const storedUsage = localStorage.getItem(CLIENT_USAGE_STORAGE_KEY);
-    let currentLastReset = now; 
-    if (storedUsage) {
-        try {
-            const usage: ClientUsageData = JSON.parse(storedUsage);
-            currentLastReset = usage.lastReset; 
-        } catch (e) {
-            console.error("Error reading stored usage for recording generation:", e);
-        }
-    }
-    
-    const newUsage: ClientUsageData = { count: newCount, lastReset: currentLastReset };
-    localStorage.setItem(CLIENT_USAGE_STORAGE_KEY, JSON.stringify(newUsage));
-    setRemainingGenerations(newCount);
-    const limitReachedAfterGeneration = newCount <= 0;
-    setIsLimitReached(limitReachedAfterGeneration);
-    console.log("Generation recorded. Remaining:", newCount, "Limit reached:", limitReachedAfterGeneration);
-    return limitReachedAfterGeneration; 
-  };
+  }, [isMobile, resetClientUsage]); 
 
   useEffect(() => {
     loadDataFromLocalStorage();
   }, [loadDataFromLocalStorage]);
+
+
+  const recordClientGeneration = () => {
+    const storedUsageString = localStorage.getItem(CLIENT_USAGE_STORAGE_KEY);
+    if (!storedUsageString) {
+      // This case should ideally be handled by loadDataFromLocalStorage initializing it.
+      // If somehow it's null, reset and bail, or handle error appropriately.
+      resetClientUsage();
+      return CLIENT_MAX_GENERATIONS_PER_DAY_BASE -1 <= 0; // Assuming one generation was just used
+    }
+    const usage: ClientUsageData = JSON.parse(storedUsageString);
+    const newCount = Math.max(0, usage.count - 1);
+    
+    const newUsage: ClientUsageData = { ...usage, count: newCount };
+    localStorage.setItem(CLIENT_USAGE_STORAGE_KEY, JSON.stringify(newUsage));
+    setRemainingGenerations(newCount);
+    
+    console.log("Generation recorded. Remaining:", newCount);
+    return newCount <= 0; 
+  };
 
 
   const handleGenerateKeywords = async (values: SuggestKeywordsInput) => {
@@ -165,13 +199,16 @@ export default function HomePage() {
       resultsContainerRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
     
-    const wasAlreadyLimited = remainingGenerations <= 0;
+    // Re-check current remaining generations right before attempting
+    const currentUsageString = localStorage.getItem(CLIENT_USAGE_STORAGE_KEY);
+    const currentUsage: ClientUsageData = currentUsageString ? JSON.parse(currentUsageString) : { count: 0, lastReset: Date.now() };
+    const localRemainingGenerations = currentUsage.count;
+
+    const wasAlreadyLimited = localRemainingGenerations <= 0;
 
     if (wasAlreadyLimited) {
-        setIsLimitReached(true); 
-        setIsLimitPopupOpen(true);
+        setIsLimitReachedPopupOpen(true);
         setIsLoading(false); 
-        console.log("Attempted generation, but limit reached.");
         logAnalyticsEvent({
             eventType: 'already_limited_attempt',
             inputMethod: values.inputMethod,
@@ -236,7 +273,7 @@ export default function HomePage() {
     setIsLoading(false);
 
     if (dailyLimitReachedThisAttempt) {
-        setIsLimitPopupOpen(true);
+        setIsLimitReachedPopupOpen(true);
         logAnalyticsEvent({
           eventType: 'limit_hit_on_attempt',
           inputMethod: values.inputMethod,
@@ -250,6 +287,58 @@ export default function HomePage() {
     }
   };
 
+  const handleEmailSubmitForBonus = async (email: string): Promise<boolean> => {
+    setIsSubmittingEmailForBonus(true);
+    setEmailForBonusError(null);
+
+    // We pass consent: true here, assuming the popup text covers the consent implication.
+    const response = await saveContactDetailsAction({ email, consent: true });
+
+    if (response.success) {
+      toast({
+        title: "Bonus Generations Added!",
+        description: "You've got 15 more generations for this cycle. You're also subscribed for updates.",
+      });
+
+      const storedUsageString = localStorage.getItem(CLIENT_USAGE_STORAGE_KEY);
+      if (storedUsageString) {
+        const usage: ClientUsageData = JSON.parse(storedUsageString);
+        const newRemaining = Math.min(usage.count + BONUS_GENERATIONS, CLIENT_MAX_GENERATIONS_PER_DAY_BASE + BONUS_GENERATIONS);
+        
+        const updatedUsage: ClientUsageData = { ...usage, count: newRemaining };
+        localStorage.setItem(CLIENT_USAGE_STORAGE_KEY, JSON.stringify(updatedUsage));
+        
+        const newBonusData: EmailBonusData = { grantedInCycleTimestamp: usage.lastReset };
+        localStorage.setItem(EMAIL_BONUS_STORAGE_KEY, JSON.stringify(newBonusData));
+
+        setRemainingGenerations(newRemaining);
+        setMaxGenerations(CLIENT_MAX_GENERATIONS_PER_DAY_BASE + BONUS_GENERATIONS);
+      }
+      
+      logAnalyticsEvent({
+        eventType: 'contact_details_submitted', // Could add a specific eventType for bonus if needed
+        email: email,
+        referralCode: storedReferralCode,
+        isMobile: isMobile,
+        // custom_field_source: 'bonus_popup' // Example if you want to distinguish
+      }).catch(console.error);
+
+      setIsLimitReachedPopupOpen(false);
+      setIsSubmittingEmailForBonus(false);
+      return true;
+    } else {
+      setEmailForBonusError(response.error || "Could not save email. Please try again.");
+      toast({
+        variant: "destructive",
+        title: "Submission Failed",
+        description: response.error || "Could not save your email. Please try again.",
+      });
+      setIsSubmittingEmailForBonus(false);
+      return false;
+    }
+  };
+
+
   const handleSubscribe = async (values: SubscribeFormValues) => {
     setIsSubmittingContact(true);
     const response = await saveContactDetailsAction(values);
@@ -258,15 +347,13 @@ export default function HomePage() {
         title: "Subscribed!",
         description: "Thanks for subscribing. We'll keep you updated.",
       });
-      // Log this event to general analytics, including the PII
-      // Note: The server action `saveContactDetailsAction` now handles the PII logging
-      // We still log a general event from the client here if needed for client-side tracking.
       logAnalyticsEvent({
         eventType: 'contact_details_submitted',
         isMobile: isMobile,
         referralCode: storedReferralCode,
-        email: values.email, // Pass email to logAnalyticsEvent
-        phone: values.phone || '' // Pass phone to logAnalyticsEvent
+        email: values.email, 
+        phone: values.phone || '',
+        // custom_field_source: 'subscribe_form' // Example
       }).catch(console.error);
     } else {
       toast({
@@ -291,7 +378,7 @@ export default function HomePage() {
               Get powerful keyword suggestions, identified from thousands of trending Reels and Shorts, to rank higher and boost engagement.
             </p>
             <p className="mt-2 text-xs text-muted-foreground/80">
-              (Daily usage limit of {CLIENT_MAX_GENERATIONS_PER_DAY} generations is stored in your browser and resets every 24 hours.)
+              (Base daily usage limit of {CLIENT_MAX_GENERATIONS_PER_DAY_BASE} generations stored in browser, resets every 24 hours. Option for bonus generations available if limit hit.)
             </p>
           </div>
           
@@ -338,11 +425,15 @@ export default function HomePage() {
 
       </main>
       <LimitReachedPopup
-        isOpen={isLimitPopupOpen}
-        onClose={() => setIsLimitPopupOpen(false)}
+        isOpen={isLimitReachedPopupOpen}
+        onClose={() => setIsLimitReachedPopupOpen(false)}
         resetTime={resetTime}
         referralCode={storedReferralCode}
-        communityUrl={COMMUNITY_URL_PLACEHOLDER} 
+        communityUrl={COMMUNITY_URL_PLACEHOLDER}
+        privacyPolicyUrl={PRIVACY_POLICY_URL_PLACEHOLDER}
+        onEmailSubmit={handleEmailSubmitForBonus}
+        isSubmittingEmail={isSubmittingEmailForBonus}
+        emailSubmissionError={emailForBonusError}
       />
     </div>
   );

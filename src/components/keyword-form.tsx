@@ -28,7 +28,7 @@ import type { SuggestKeywordsInput } from '@/ai/flows/suggest-keywords';
 
 const formSchema = z.object({
   inputMethod: z.enum(['caption', 'script', 'title'], {
-    required_error: 'Please select an input method.',
+    required_error: 'Please select a content type.',
   }),
   platform: z.enum(['youtube shorts', 'instagram reels', 'tiktok', 'linkedin video'], {
     required_error: 'Please select a platform.',
@@ -47,7 +47,7 @@ interface KeywordFormProps {
   isLoading: boolean; // True when the form submission is in progress
 }
 
-const inputMethodOptions = [
+const contentTypeOptions = [
   { value: 'caption', label: 'Caption', icon: <Captions className="mr-2 h-4 w-4" /> },
   { value: 'script', label: 'Video Script', icon: <FileText className="mr-2 h-4 w-4" /> },
   { value: 'title', label: 'Video Title', icon: <Type className="mr-2 h-4 w-4" /> },
@@ -81,15 +81,15 @@ export function KeywordForm({ onSubmit, isLoading }: KeywordFormProps) {
             name="inputMethod"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Input Method</FormLabel>
+                <FormLabel>Content Type</FormLabel>
                 <Select onValueChange={field.onChange} defaultValue={field.value} disabled={isLoading}>
                   <FormControl>
                     <SelectTrigger>
-                      <SelectValue placeholder="Select an input method" />
+                      <SelectValue placeholder="Select content type" />
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
-                    {inputMethodOptions.map((option) => (
+                    {contentTypeOptions.map((option) => (
                       <SelectItem key={option.value} value={option.value}>
                         <div className="flex items-center">
                           {option.icon}
@@ -100,7 +100,7 @@ export function KeywordForm({ onSubmit, isLoading }: KeywordFormProps) {
                   </SelectContent>
                 </Select>
                 <FormDescription>
-                  How are you providing input for keyword suggestions?
+                  What type of content are you providing for analysis?
                 </FormDescription>
                 <FormMessage />
               </FormItem>
@@ -154,7 +154,7 @@ export function KeywordForm({ onSubmit, isLoading }: KeywordFormProps) {
                 />
               </FormControl>
               <FormDescription>
-                Provide the text based on your selected input method.
+                Provide the text based on your selected content type.
               </FormDescription>
               <FormMessage />
             </FormItem>

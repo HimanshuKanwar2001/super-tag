@@ -77,7 +77,7 @@ export function LimitReachedPopup({
       setTimeLeft(newTimeLeft);
       if (newTimeLeft.total <= 0) {
         clearInterval(timer);
-        onClose();
+        onClose(); // Optionally close popup when time is up
       }
     }, 1000);
 
@@ -106,7 +106,12 @@ export function LimitReachedPopup({
   }
 
   const unlockBaseUrl = "https://creatorpreneurclub.superprofile.bio/india/";
-  const unlockUrl = referralCode ? `${unlockBaseUrl}?referralCode=${referralCode}` : unlockBaseUrl;
+  let unlockUrl = unlockBaseUrl;
+  if (referralCode) {
+    // Robustly append referralCode, handling if unlockBaseUrl already has query params
+    const separator = unlockBaseUrl.includes('?') ? '&' : '?';
+    unlockUrl = `${unlockBaseUrl}${separator}referralCode=${encodeURIComponent(referralCode)}`;
+  }
 
   return (
     <AlertDialog open={isOpen} onOpenChange={(openState) => { if (!openState) onClose(); }}>
@@ -130,7 +135,7 @@ export function LimitReachedPopup({
         
         <div className="my-4 p-4 border border-dashed border-border rounded-lg bg-card/50">
           <p className="text-sm text-center text-foreground font-medium mb-2">
-            Want more generations now?
+            Want {bonusGenerationsCount} more generations now?
           </p>
           <p className="text-xs text-center text-muted-foreground mb-3">
             Share your email to get <strong>{bonusGenerationsCount} bonus generations</strong> for this cycle and subscribe to our updates.
@@ -165,7 +170,7 @@ export function LimitReachedPopup({
             {isSubmittingEmail ? (
               <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Submitting...</>
             ) : (
-              'Submit Email & Get Bonus'
+              `Submit Email & Get ${bonusGenerationsCount} Bonus`
             )}
           </Button>
         </div>
@@ -202,5 +207,3 @@ export function LimitReachedPopup({
     </AlertDialog>
   );
 }
-
-    

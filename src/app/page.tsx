@@ -9,9 +9,7 @@ import { getKeywordsAction, logAnalyticsEvent, saveContactDetailsAction } from '
 import type { SuggestKeywordsInput, SuggestKeywordsOutput } from '@/ai/flows/suggest-keywords';
 import { useToast } from "@/hooks/use-toast";
 import { LimitReachedPopup } from '@/components/limit-reached-popup';
-// import { SubscribeForm, type SubscribeFormValues } from '@/components/subscribe-form'; // Removed
 import { useIsMobile } from '@/hooks/use-mobile';
-// import { Separator } from '@/components/ui/separator'; // Removed
 
 const CLIENT_MAX_GENERATIONS_PER_DAY_BASE = 5;
 const BONUS_GENERATIONS = 5; 
@@ -40,7 +38,6 @@ interface EmailBonusData {
 export default function HomePage() {
   const [results, setResults] = useState<SuggestKeywordsOutput | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  // const [isSubmittingContact, setIsSubmittingContact] = useState(false); // Removed
   const [error, setError] = useState<string | null>(null);
   
   const [remainingGenerations, setRemainingGenerations] = useState<number>(CLIENT_MAX_GENERATIONS_PER_DAY_BASE);
@@ -155,11 +152,27 @@ export default function HomePage() {
       }
     }
     setStoredReferralCode(activeReferralCode);
+    console.log("Active referral code after loadData:", activeReferralCode);
 
   }, [isMobile, resetClientUsage]); 
 
   useEffect(() => {
     loadDataFromLocalStorage();
+
+    const handleReferralCodeUpdate = (event: Event) => {
+      console.log('Custom event "referralCodeUpdated" received in page.tsx');
+      const customEvent = event as CustomEvent<{ referralCode: string }>;
+      if (customEvent.detail && customEvent.detail.referralCode) {
+        // Re-run logic to load/update referral code state
+        loadDataFromLocalStorage();
+      }
+    };
+
+    window.addEventListener('referralCodeUpdated', handleReferralCodeUpdate);
+
+    return () => {
+      window.removeEventListener('referralCodeUpdated', handleReferralCodeUpdate);
+    };
   }, [loadDataFromLocalStorage]);
 
 
@@ -282,7 +295,7 @@ export default function HomePage() {
     setIsSubmittingEmailForBonus(true);
     setEmailForBonusError(null);
 
-    const response = await saveContactDetailsAction({ email, consent: true }); // Consent is implied by popup text
+    const response = await saveContactDetailsAction({ email, consent: true }); 
 
     if (response.success) {
       toast({
@@ -327,8 +340,6 @@ export default function HomePage() {
     }
   };
 
-  // Removed handleSubscribe function as the form is removed
-
   return (
     <div className="min-h-screen flex flex-col bg-background">
       <main className="flex-grow container mx-auto px-4 md:px-6 py-8 md:py-12">
@@ -360,7 +371,6 @@ export default function HomePage() {
           </div>
         </section>
 
-        {/* Removed Separator and SubscribeForm section */}
       </main>
       <LimitReachedPopup
         isOpen={isLimitReachedPopupOpen}

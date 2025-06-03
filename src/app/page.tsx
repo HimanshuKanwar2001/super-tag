@@ -9,9 +9,9 @@ import { getKeywordsAction, logAnalyticsEvent, saveContactDetailsAction } from '
 import type { SuggestKeywordsInput, SuggestKeywordsOutput } from '@/ai/flows/suggest-keywords';
 import { useToast } from "@/hooks/use-toast";
 import { LimitReachedPopup } from '@/components/limit-reached-popup';
-import { SubscribeForm, type SubscribeFormValues } from '@/components/subscribe-form';
+// import { SubscribeForm, type SubscribeFormValues } from '@/components/subscribe-form'; // Removed
 import { useIsMobile } from '@/hooks/use-mobile';
-import { Separator } from '@/components/ui/separator';
+// import { Separator } from '@/components/ui/separator'; // Removed
 
 const CLIENT_MAX_GENERATIONS_PER_DAY_BASE = 5;
 const BONUS_GENERATIONS = 5; 
@@ -40,7 +40,7 @@ interface EmailBonusData {
 export default function HomePage() {
   const [results, setResults] = useState<SuggestKeywordsOutput | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [isSubmittingContact, setIsSubmittingContact] = useState(false);
+  // const [isSubmittingContact, setIsSubmittingContact] = useState(false); // Removed
   const [error, setError] = useState<string | null>(null);
   
   const [remainingGenerations, setRemainingGenerations] = useState<number>(CLIENT_MAX_GENERATIONS_PER_DAY_BASE);
@@ -282,7 +282,7 @@ export default function HomePage() {
     setIsSubmittingEmailForBonus(true);
     setEmailForBonusError(null);
 
-    const response = await saveContactDetailsAction({ email, consent: true });
+    const response = await saveContactDetailsAction({ email, consent: true }); // Consent is implied by popup text
 
     if (response.success) {
       toast({
@@ -327,32 +327,7 @@ export default function HomePage() {
     }
   };
 
-
-  const handleSubscribe = async (values: SubscribeFormValues) => {
-    setIsSubmittingContact(true);
-    const response = await saveContactDetailsAction(values);
-    if (response.success) {
-      toast({
-        title: "Subscribed!",
-        description: "Thanks for subscribing. We'll keep you updated.",
-      });
-      logAnalyticsEvent({
-        eventType: 'contact_details_submitted',
-        isMobile: isMobile,
-        referralCode: storedReferralCode,
-        email: values.email, 
-        phone: values.phone || '',
-      }).catch(console.error);
-    } else {
-      toast({
-        variant: "destructive",
-        title: "Subscription Failed",
-        description: response.error || "Could not save your details. Please try again.",
-      });
-    }
-    setIsSubmittingContact(false);
-  };
-  
+  // Removed handleSubscribe function as the form is removed
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
@@ -391,26 +366,7 @@ export default function HomePage() {
           </div>
         </section>
 
-        <Separator className="my-12 md:my-16" />
-
-        <section className="max-w-2xl mx-auto">
-            <div className="text-center mb-8">
-                <h2 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
-                    Stay Updated!
-                </h2>
-                <p className="mt-3 text-lg text-muted-foreground">
-                    Subscribe to get the latest tips, feature updates, and exclusive content directly to your inbox.
-                </p>
-            </div>
-            <div className="bg-card p-6 sm:p-8 rounded-xl shadow-xl">
-                <SubscribeForm 
-                    onSubmit={handleSubscribe} 
-                    isLoading={isSubmittingContact}
-                    privacyPolicyUrl={PRIVACY_POLICY_URL_PLACEHOLDER}
-                />
-            </div>
-        </section>
-
+        {/* Removed Separator and SubscribeForm section */}
       </main>
       <LimitReachedPopup
         isOpen={isLimitReachedPopupOpen}

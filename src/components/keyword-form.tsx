@@ -2,6 +2,7 @@
 'use client';
 
 import type React from 'react';
+import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -23,7 +24,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { Captions, FileText, Film, Instagram, Linkedin, Loader2, Type, Youtube } from 'lucide-react';
+import { Captions, FileText, Film, Instagram, Linkedin, Loader2, Type, Youtube, Users } from 'lucide-react';
 import type { SuggestKeywordsInput } from '@/ai/flows/suggest-keywords';
 
 const formSchema = z.object({
@@ -44,7 +45,10 @@ type KeywordFormValues = z.infer<typeof formSchema>;
 
 interface KeywordFormProps {
   onSubmit: (values: SuggestKeywordsInput) => Promise<void>;
-  isLoading: boolean; // True when the form submission is in progress
+  isLoading: boolean;
+  remainingGenerations: number | null;
+  maxGenerations: number | null;
+  resetTime?: number;
 }
 
 const contentTypeOptions = [
@@ -60,7 +64,7 @@ const platformOptions = [
   { value: 'linkedin video', label: 'LinkedIn Video', icon: <Linkedin className="mr-2 h-4 w-4" /> },
 ];
 
-export function KeywordForm({ onSubmit, isLoading }: KeywordFormProps) {
+export function KeywordForm({ onSubmit, isLoading, remainingGenerations, maxGenerations, resetTime }: KeywordFormProps) {
   const form = useForm<KeywordFormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -68,8 +72,39 @@ export function KeywordForm({ onSubmit, isLoading }: KeywordFormProps) {
     },
   });
 
+  const [formattedResetTimeForDisplay, setFormattedResetTimeForDisplay] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (resetTime) {
+      const date = new Date(resetTime);
+      setFormattedResetTimeForDisplay(date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+    } else {
+      setFormattedResetTimeForDisplay(null);
+    }
+  }, [resetTime]);
+
   const handleSubmit = async (values: KeywordFormValues) => {
     await onSubmit(values as SuggestKeywordsInput);
+  };
+
+  const renderUsageInfo = () => {
+    if (isLoading && (remainingGenerations === null || maxGenerations === null)) {
+        // Show nothing or a subtle loader if preferred during the form's own loading state
+        return <div className="h-5 w-28 animate-pulse rounded bg-muted/50 md:ml-auto"></div>;
+    }
+    if (remainingGenerations !== null && maxGenerations !== null) {
+      const isDepleted = remainingGenerations <= 0;
+      return (
+        <div className={`text-xs ${isDepleted ? 'text-destructive' : 'text-muted-foreground'} flex items-center justify-center md:justify-end md:ml-auto whitespace-nowrap`}>
+          <Users className="mr-1.5 h-3.5 w-3.5 shrink-0" />
+          Daily Usage: {remainingGenerations}/{maxGenerations}
+          {isDepleted && formattedResetTimeForDisplay && (
+            <span className="ml-1 truncate"> (Resets: {formattedResetTimeForDisplay})</span>
+          )}
+        </div>
+      );
+    }
+    return <div className="h-5 w-28 md:ml-auto"></div>; // Placeholder for alignment if no data
   };
 
   return (
@@ -161,16 +196,21 @@ export function KeywordForm({ onSubmit, isLoading }: KeywordFormProps) {
           )}
         />
 
-        <Button type="submit" disabled={isLoading} className="w-full md:w-auto">
-          {isLoading ? (
-            <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Generating...
-            </>
-          ) : (
-            'Suggest Keywords'
-          )}
-        </Button>
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 pt-2">
+          <Button type="submit" disabled={isLoading} className="w-full md:w-auto order-1 md:order-none">
+            {isLoading ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Generating...
+              </>
+            ) : (
+              'Suggest Keywords'
+            )}
+          </Button>
+          <div className="order-none md:order-1 w-full md:w-auto flex justify-center md:justify-end">
+             {renderUsageInfo()}
+          </div>
+        </div>
       </form>
     </Form>
   );

@@ -14,27 +14,27 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { Separator } from '@/components/ui/separator';
 
 const CLIENT_MAX_GENERATIONS_PER_DAY_BASE = 5;
-const BONUS_GENERATIONS = 5; // Changed from 15 to 5
+const BONUS_GENERATIONS = 5; 
 const CLIENT_USAGE_STORAGE_KEY = 'keywordGeneratorUsage';
 const REFERRAL_CODE_STORAGE_KEY = 'referralCodeData';
-const EMAIL_BONUS_STORAGE_KEY = 'keywordGeneratorEmailBonusData'; // New key for bonus tracking
+const EMAIL_BONUS_STORAGE_KEY = 'keywordGeneratorEmailBonusData'; 
 const REFERRAL_CODE_EXPIRY_DAYS = 30;
-const COMMUNITY_URL_PLACEHOLDER = 'https://example.com/community'; // Remember to replace this!
-const PRIVACY_POLICY_URL_PLACEHOLDER = '/privacy-policy'; // Remember to replace this!
+const COMMUNITY_URL_PLACEHOLDER = 'https://example.com/community'; 
+const PRIVACY_POLICY_URL_PLACEHOLDER = '/privacy-policy'; 
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 
 interface ClientUsageData {
-  count: number; // Remaining generations
-  lastReset: number; // Timestamp of the last reset
+  count: number; 
+  lastReset: number; 
 }
 
 interface ReferralCodeData {
   code: string;
-  expiresAt: number; // Timestamp
+  expiresAt: number; 
 }
 
 interface EmailBonusData {
-  grantedInCycleTimestamp: number | null; // Timestamp of the usage.lastReset when bonus was granted
+  grantedInCycleTimestamp: number | null; 
 }
 
 export default function HomePage() {
@@ -79,18 +79,16 @@ export default function HomePage() {
     let currentRemainingGenerations = CLIENT_MAX_GENERATIONS_PER_DAY_BASE;
     let currentResetTime = now + ONE_DAY_MS;
 
-    // Load Usage Data
     try {
       const storedUsageString = localStorage.getItem(CLIENT_USAGE_STORAGE_KEY);
       let usage: ClientUsageData;
 
       if (storedUsageString) {
         usage = JSON.parse(storedUsageString);
-        if (now < usage.lastReset + ONE_DAY_MS) { // Current cycle active
+        if (now < usage.lastReset + ONE_DAY_MS) { 
           currentRemainingGenerations = usage.count;
           currentResetTime = usage.lastReset + ONE_DAY_MS;
 
-          // Check for bonus in this active cycle
           const storedBonusString = localStorage.getItem(EMAIL_BONUS_STORAGE_KEY);
           if (storedBonusString) {
             const bonusData: EmailBonusData = JSON.parse(storedBonusString);
@@ -98,19 +96,16 @@ export default function HomePage() {
               currentMaxGenerations = CLIENT_MAX_GENERATIONS_PER_DAY_BASE + BONUS_GENERATIONS;
             }
           }
-        } else { // Cycle expired
+        } else { 
           console.log("Daily limit period expired, resetting usage.");
-          resetClientUsage(); // This will set initial states
-          // After resetClientUsage, values are set, so we can return early or let the below setters run with reset values.
-          // For clarity, we'll let the state setters at the end handle it based on fresh reset values.
-          // Re-fetch fresh values after reset.
+          resetClientUsage(); 
           const freshUsageString = localStorage.getItem(CLIENT_USAGE_STORAGE_KEY);
           usage = freshUsageString ? JSON.parse(freshUsageString) : { count: CLIENT_MAX_GENERATIONS_PER_DAY_BASE, lastReset: now};
           currentRemainingGenerations = usage.count;
           currentResetTime = usage.lastReset + ONE_DAY_MS;
           currentMaxGenerations = CLIENT_MAX_GENERATIONS_PER_DAY_BASE;
         }
-      } else { // No usage data, initialize
+      } else { 
         console.log("No usage data found, initializing.");
         resetClientUsage();
         const freshUsageString = localStorage.getItem(CLIENT_USAGE_STORAGE_KEY);
@@ -128,7 +123,6 @@ export default function HomePage() {
       resetClientUsage(); 
     }
 
-    // Load/Update Referral Code
     const queryParams = new URLSearchParams(window.location.search);
     const urlReferralCode = queryParams.get('referralCode');
     let activeReferralCode: string | null = null;
@@ -172,10 +166,8 @@ export default function HomePage() {
   const recordClientGeneration = () => {
     const storedUsageString = localStorage.getItem(CLIENT_USAGE_STORAGE_KEY);
     if (!storedUsageString) {
-      // This case should ideally be handled by loadDataFromLocalStorage initializing it.
-      // If somehow it's null, reset and bail, or handle error appropriately.
       resetClientUsage();
-      return CLIENT_MAX_GENERATIONS_PER_DAY_BASE -1 <= 0; // Assuming one generation was just used
+      return CLIENT_MAX_GENERATIONS_PER_DAY_BASE -1 <= 0; 
     }
     const usage: ClientUsageData = JSON.parse(storedUsageString);
     const newCount = Math.max(0, usage.count - 1);
@@ -199,7 +191,6 @@ export default function HomePage() {
       resultsContainerRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
     
-    // Re-check current remaining generations right before attempting
     const currentUsageString = localStorage.getItem(CLIENT_USAGE_STORAGE_KEY);
     const currentUsage: ClientUsageData = currentUsageString ? JSON.parse(currentUsageString) : { count: 0, lastReset: Date.now() };
     const localRemainingGenerations = currentUsage.count;
@@ -291,7 +282,6 @@ export default function HomePage() {
     setIsSubmittingEmailForBonus(true);
     setEmailForBonusError(null);
 
-    // We pass consent: true here, assuming the popup text covers the consent implication.
     const response = await saveContactDetailsAction({ email, consent: true });
 
     if (response.success) {
@@ -316,11 +306,10 @@ export default function HomePage() {
       }
       
       logAnalyticsEvent({
-        eventType: 'contact_details_submitted', // Could add a specific eventType for bonus if needed
+        eventType: 'contact_details_submitted', 
         email: email,
         referralCode: storedReferralCode,
         isMobile: isMobile,
-        // custom_field_source: 'bonus_popup' // Example if you want to distinguish
       }).catch(console.error);
 
       setIsLimitReachedPopupOpen(false);
@@ -353,7 +342,6 @@ export default function HomePage() {
         referralCode: storedReferralCode,
         email: values.email, 
         phone: values.phone || '',
-        // custom_field_source: 'subscribe_form' // Example
       }).catch(console.error);
     } else {
       toast({
@@ -387,6 +375,9 @@ export default function HomePage() {
               <KeywordForm 
                 onSubmit={handleGenerateKeywords} 
                 isLoading={isLoading}
+                remainingGenerations={remainingGenerations}
+                maxGenerations={maxGenerations}
+                resetTime={resetTime}
               />
             </div>
             
@@ -394,10 +385,7 @@ export default function HomePage() {
               <KeywordResults 
                 results={results} 
                 isLoading={isLoading && (results === null)} 
-                error={error} 
-                remainingGenerations={remainingGenerations}
-                maxGenerations={maxGenerations}
-                resetTime={resetTime}
+                error={error}
               />
             </div>
           </div>
@@ -439,5 +427,3 @@ export default function HomePage() {
     </div>
   );
 }
-
-    

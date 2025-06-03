@@ -2,11 +2,11 @@
 'use client';
 
 import type React from 'react';
-import { useState, useEffect } from 'react';
+// import { useState, useEffect } from 'react'; // No longer needed for resetTime display here
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
-import { ThumbsUp, AlertCircle, Info, Copy, ListChecks, Users, Brain, Loader2, Sparkles, SearchCheck } from 'lucide-react';
+import { ThumbsUp, AlertCircle, Info, Copy, ListChecks, Brain, Loader2, Sparkles, SearchCheck } from 'lucide-react';
 import type { SuggestKeywordsOutput } from '@/ai/flows/suggest-keywords';
 import { useToast } from "@/hooks/use-toast";
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -15,30 +15,31 @@ interface KeywordResultsProps {
   results: SuggestKeywordsOutput | null;
   isLoading: boolean;
   error: string | null;
-  remainingGenerations: number | null; 
-  maxGenerations: number | null;     
-  resetTime?: number;               
+  // Props for usage info are removed as it's displayed elsewhere
+  // remainingGenerations: number | null; 
+  // maxGenerations: number | null;     
+  // resetTime?: number;               
 }
 
 export function KeywordResults({ 
   results, 
   isLoading, 
-  error, 
-  remainingGenerations, 
-  maxGenerations,
-  resetTime 
+  error,
+  // remainingGenerations,  // Removed
+  // maxGenerations,       // Removed
+  // resetTime             // Removed
 }: KeywordResultsProps) {
   const { toast } = useToast();
-  const [formattedResetTimeForDisplay, setFormattedResetTimeForDisplay] = useState<string | null>(null);
+  // const [formattedResetTimeForDisplay, setFormattedResetTimeForDisplay] = useState<string | null>(null); // Removed
 
-  useEffect(() => {
-    if (resetTime) {
-      const date = new Date(resetTime);
-      setFormattedResetTimeForDisplay(date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
-    } else {
-      setFormattedResetTimeForDisplay(null);
-    }
-  }, [resetTime]);
+  // useEffect(() => { // Removed
+  //   if (resetTime) {
+  //     const date = new Date(resetTime);
+  //     setFormattedResetTimeForDisplay(date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+  //   } else {
+  //     setFormattedResetTimeForDisplay(null);
+  //   }
+  // }, [resetTime]);
 
   const handleCopyAllKeywords = () => {
     if (results && results.keywords.length > 0) {
@@ -62,24 +63,24 @@ export function KeywordResults({
     }
   };
 
-  const renderUsageInfo = () => {
-    if (isLoading && (remainingGenerations === null || maxGenerations === null)) {
-        return <div className="h-4 w-28 bg-muted rounded animate-pulse" />; 
-    }
-    if (remainingGenerations !== null && maxGenerations !== null) {
-      const isDepleted = remainingGenerations <= 0;
-      return (
-        <div className={`text-xs ${isDepleted ? 'text-destructive' : 'text-muted-foreground'} flex items-center whitespace-nowrap`}>
-          <Users className="mr-1.5 h-3.5 w-3.5 shrink-0" />
-          Daily Usage: {remainingGenerations}/{maxGenerations}
-          {isDepleted && formattedResetTimeForDisplay && (
-            <span className="ml-1 truncate"> (Resets: {formattedResetTimeForDisplay})</span>
-          )}
-        </div>
-      );
-    }
-    return null; 
-  };
+  // const renderUsageInfo = () => { // Removed
+  //   if (isLoading && (remainingGenerations === null || maxGenerations === null)) {
+  //       return <div className="h-4 w-28 bg-muted rounded animate-pulse" />; 
+  //   }
+  //   if (remainingGenerations !== null && maxGenerations !== null) {
+  //     const isDepleted = remainingGenerations <= 0;
+  //     return (
+  //       <div className={`text-xs ${isDepleted ? 'text-destructive' : 'text-muted-foreground'} flex items-center whitespace-nowrap`}>
+  //         <Users className="mr-1.5 h-3.5 w-3.5 shrink-0" />
+  //         Daily Usage: {remainingGenerations}/{maxGenerations}
+  //         {isDepleted && formattedResetTimeForDisplay && (
+  //           <span className="ml-1 truncate"> (Resets: {formattedResetTimeForDisplay})</span>
+  //         )}
+  //       </div>
+  //     );
+  //   }
+  //   return null; 
+  // };
 
 
   if (isLoading && !results && !error) { 
@@ -91,7 +92,7 @@ export function KeywordResults({
               <SearchCheck className="mr-3 h-6 w-6 text-primary shrink-0 animate-pulse" />
               Finding Your Keywords...
             </CardTitle>
-            {renderUsageInfo()} 
+            {/* {renderUsageInfo()} Removed */}
           </div>
         </CardHeader>
         <CardContent className="flex-grow flex flex-col items-center justify-center text-center p-6 sm:p-10 space-y-3">
@@ -120,7 +121,7 @@ export function KeywordResults({
                <AlertCircle className="mr-3 h-6 w-6 shrink-0" />
               Error
             </CardTitle>
-            {renderUsageInfo()}
+            {/* {renderUsageInfo()} Removed */}
           </div>
         </CardHeader>
         <CardContent className="flex-grow flex items-center justify-center p-6">
@@ -145,7 +146,7 @@ export function KeywordResults({
                     <ListChecks className="mr-3 h-6 w-6 text-primary shrink-0" />
                     Keyword Suggestions
                 </CardTitle>
-                {renderUsageInfo()}
+                {/* {renderUsageInfo()} Removed */}
             </div>
         </CardHeader>
         <CardContent className="flex-grow flex flex-col items-center justify-center text-center p-6">
@@ -183,7 +184,7 @@ export function KeywordResults({
                     Copy All
                 </Button>
                 )}
-                {renderUsageInfo()}
+                {/* {renderUsageInfo()} Removed */}
             </div>
         </div>
       </CardHeader>

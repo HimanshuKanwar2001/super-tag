@@ -334,12 +334,7 @@ export default function HomePage() {
       <main className="flex-grow container mx-auto px-4 md:px-6 py-8 md:py-12">
         <section className="max-w-6xl mx-auto">
           <div className="text-center mb-8 md:mb-12">
-            <h1 className="text-4xl font-bold tracking-tight text-foreground sm:text-5xl">
-              Unlock Your Content's Potential
-            </h1>
-            <p className="mt-3 text-lg text-muted-foreground">
-              Get powerful keyword suggestions, identified from thousands of trending Reels and Shorts, to rank higher and boost engagement.
-            </p>
+            {/* Heading and subheading removed */}
             <p className="mt-2 text-xs text-muted-foreground/80">
               (Base daily usage limit of {CLIENT_MAX_GENERATIONS_PER_DAY_BASE} generations stored in browser, resets every 24 hours. Option for {BONUS_GENERATIONS} bonus generations available if limit hit.)
             </p>

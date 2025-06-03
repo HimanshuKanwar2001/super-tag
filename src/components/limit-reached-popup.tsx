@@ -25,6 +25,7 @@ interface LimitReachedPopupProps {
   onEmailSubmit: (email: string) => Promise<boolean>;
   isSubmittingEmail: boolean;
   emailSubmissionError: string | null;
+  bonusGenerationsCount: number; // To display the correct number
 }
 
 const calculateTimeLeft = (targetTime: number | undefined) => {
@@ -58,6 +59,7 @@ export function LimitReachedPopup({
   onEmailSubmit,
   isSubmittingEmail,
   emailSubmissionError,
+  bonusGenerationsCount,
 }: LimitReachedPopupProps) {
   const [timeLeft, setTimeLeft] = useState(calculateTimeLeft(resetTime));
   const [email, setEmail] = useState('');
@@ -131,7 +133,7 @@ export function LimitReachedPopup({
             Want more generations now?
           </p>
           <p className="text-xs text-center text-muted-foreground mb-3">
-            Share your email to get <strong>15 bonus generations</strong> for this cycle and subscribe to our updates.
+            Share your email to get <strong>{bonusGenerationsCount} bonus generations</strong> for this cycle and subscribe to our updates.
             By submitting, you agree to our{' '}
             <a href={privacyPolicyUrl} target="_blank" rel="noopener noreferrer" className="underline hover:text-primary">
               Privacy Policy
@@ -200,3 +202,5 @@ export function LimitReachedPopup({
     </AlertDialog>
   );
 }
+
+    

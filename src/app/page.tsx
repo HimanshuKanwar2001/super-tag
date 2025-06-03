@@ -14,7 +14,7 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { Separator } from '@/components/ui/separator';
 
 const CLIENT_MAX_GENERATIONS_PER_DAY_BASE = 5;
-const BONUS_GENERATIONS = 15;
+const BONUS_GENERATIONS = 5; // Changed from 15 to 5
 const CLIENT_USAGE_STORAGE_KEY = 'keywordGeneratorUsage';
 const REFERRAL_CODE_STORAGE_KEY = 'referralCodeData';
 const EMAIL_BONUS_STORAGE_KEY = 'keywordGeneratorEmailBonusData'; // New key for bonus tracking
@@ -297,7 +297,7 @@ export default function HomePage() {
     if (response.success) {
       toast({
         title: "Bonus Generations Added!",
-        description: "You've got 15 more generations for this cycle. You're also subscribed for updates.",
+        description: `You've got ${BONUS_GENERATIONS} more generations for this cycle. You're also subscribed for updates.`,
       });
 
       const storedUsageString = localStorage.getItem(CLIENT_USAGE_STORAGE_KEY);
@@ -378,7 +378,7 @@ export default function HomePage() {
               Get powerful keyword suggestions, identified from thousands of trending Reels and Shorts, to rank higher and boost engagement.
             </p>
             <p className="mt-2 text-xs text-muted-foreground/80">
-              (Base daily usage limit of {CLIENT_MAX_GENERATIONS_PER_DAY_BASE} generations stored in browser, resets every 24 hours. Option for bonus generations available if limit hit.)
+              (Base daily usage limit of {CLIENT_MAX_GENERATIONS_PER_DAY_BASE} generations stored in browser, resets every 24 hours. Option for {BONUS_GENERATIONS} bonus generations available if limit hit.)
             </p>
           </div>
           
@@ -434,7 +434,10 @@ export default function HomePage() {
         onEmailSubmit={handleEmailSubmitForBonus}
         isSubmittingEmail={isSubmittingEmailForBonus}
         emailSubmissionError={emailForBonusError}
+        bonusGenerationsCount={BONUS_GENERATIONS}
       />
     </div>
   );
 }
+
+    

@@ -21,15 +21,17 @@ export async function getKeywordsAction(
     const validationResult = KeywordActionInputSchema.safeParse(data);
     if (!validationResult.success) {
       const errorMessage = validationResult.error.errors.map(e => e.message).join(', ');
-      logAnalyticsEvent({
-        eventType: 'keyword_generation_failure',
-        inputMethod: data.inputMethod,
-        platform: data.platform,
-        inputTextLength: data.inputText?.length || 0,
-        errorMessage: `Validation Error: ${errorMessage}`,
-      }).catch(err => {
-        console.error("Failed to log validation_failure event:", err);
-      });
+      try {
+        await logAnalyticsEvent({
+          eventType: 'keyword_generation_failure',
+          inputMethod: data.inputMethod,
+          platform: data.platform,
+          inputTextLength: data.inputText?.length || 0,
+          errorMessage: `Validation Error: ${errorMessage}`,
+        });
+      } catch (logErr) {
+        console.error("Failed to log validation_failure event:", logErr);
+      }
       return {
         success: false,
         error: errorMessage
@@ -43,6 +45,18 @@ export async function getKeywordsAction(
         data: result
       };
     } else {
+      // It's good practice to log if the AI returned an unexpected (but not erroring) result
+      try {
+        await logAnalyticsEvent({
+          eventType: 'keyword_generation_failure',
+          inputMethod: validationResult.data.inputMethod,
+          platform: validationResult.data.platform,
+          inputTextLength: validationResult.data.inputText.length,
+          errorMessage: 'AI returned unexpected result (no keywords or falsy result)',
+        });
+      } catch (logErr) {
+          console.error("Failed to log AI unexpected result event:", logErr);
+      }
       return {
         success: false,
         error: 'Failed to generate keywords. The AI returned an unexpected result.'
@@ -50,21 +64,34 @@ export async function getKeywordsAction(
     }
   } catch (e: any) {
     console.error("Outer unhandled error in getKeywordsAction:", e);
-    let errorMessage = 'An unexpected error occurred while generating keywords.';
+
+    let originalErrorMessage = "Unknown error from action";
     if (e instanceof Error) {
-        errorMessage = e.message;
+      originalErrorMessage = e.message;
+    } else if (typeof e === 'string') {
+      originalErrorMessage = e;
+    } else {
+      try {
+        originalErrorMessage = JSON.stringify(e);
+      } catch {
+        originalErrorMessage = String(e);
+      }
     }
-    // Log critical failure event, but try to get data from the input if possible
-     logAnalyticsEvent({
+
+    // Attempt to log the failure, but don't let this logging crash the action
+    try {
+      await logAnalyticsEvent({
         eventType: 'keyword_generation_failure',
-        errorMessage: `Critical Action Error: ${errorMessage}`,
-        inputMethod: data?.inputMethod,
+        errorMessage: `Critical Action Error: ${originalErrorMessage}`,
+        inputMethod: data?.inputMethod, // data might be null if error happened before validation
         platform: data?.platform,
         inputTextLength: data?.inputText?.length,
-      }).catch(err => {
-          console.error("Failed to log critical_failure event:", err);
       });
-    return { success: false, error: "An unexpected server error occurred." };
+    } catch (loggingError: any) {
+      console.error("Failed to log critical_failure event during getKeywordsAction error handling. Logging error: ", loggingError?.message || String(loggingError));
+    }
+    // ALWAYS return a JSON response
+    return { success: false, error: "An unexpected server error occurred while generating keywords. Please try again." };
   }
 }
 
@@ -89,8 +116,7 @@ export async function saveContactDetailsAction(
     await logAnalyticsEvent({
       eventType: 'contact_details_submitted',
       email: email,
-      phone: phone || '', // Ensure phone is a string, even if empty
-      // Add any other relevant analytics data here, e.g., referralCode if available client-side
+      phone: phone || '', 
     });
 
     console.log('Contact Details Submitted & Logged:');
@@ -105,13 +131,15 @@ export async function saveContactDetailsAction(
     return { success: true };
   } catch (error: any) {
     console.error('Error in saveContactDetailsAction:', error);
-    // Optionally, log this failure to analytics as well, but without PII
-    logAnalyticsEvent({
-      eventType: 'keyword_generation_failure', // Re-using this, or create a new 'contact_submission_failure'
-      errorMessage: `Error in saveContactDetailsAction: ${error.message || 'Unknown error'}`,
-    }).catch(err => {
-      console.error("Failed to log contact_submission_failure event:", err);
-    });
+    const originalErrorMessage = error.message || 'Unknown error in saveContactDetailsAction';
+    try {
+        await logAnalyticsEvent({
+        eventType: 'keyword_generation_failure', 
+        errorMessage: `Error in saveContactDetailsAction: ${originalErrorMessage}`,
+        });
+    } catch (logErr: any) {
+        console.error("Failed to log contact_submission_failure event. Logging error:", logErr?.message || String(logErr));
+    }
     return { success: false, error: 'An unexpected server error occurred while saving your details.' };
   }
 }
@@ -130,8 +158,8 @@ interface AnalyticsEventData {
   wasAlreadyLimited?: boolean;
   isMobile?: boolean;
   errorMessage?: string;
-  email?: string; // New field for email
-  phone?: string; // New field for phone
+  email?: string; 
+  phone?: string; 
 }
 
 /**
@@ -167,8 +195,7 @@ export async function logAnalyticsEvent(eventData: Omit<AnalyticsEventData, 'tim
 
     const sheets = google.sheets({ version: 'v4', auth });
     const spreadsheetId = process.env.GOOGLE_SPREADSHEET_ID;
-    // Updated range to include new columns for email and phone (A to M for 13 columns)
-    const range = 'Sheet1!A:M';
+    const range = 'Sheet1!A:M'; // Adjusted for 13 columns (A to M)
 
     const values = [[
       completeEventData.timestamp,
@@ -182,8 +209,8 @@ export async function logAnalyticsEvent(eventData: Omit<AnalyticsEventData, 'tim
       completeEventData.wasAlreadyLimited !== undefined ? completeEventData.wasAlreadyLimited : '',
       completeEventData.isMobile !== undefined ? completeEventData.isMobile : '',
       completeEventData.errorMessage || '',
-      completeEventData.email || '', // New: Email
-      completeEventData.phone || '', // New: Phone
+      completeEventData.email || '', 
+      completeEventData.phone || '', 
     ]];
 
     await sheets.spreadsheets.values.append({
@@ -201,5 +228,7 @@ export async function logAnalyticsEvent(eventData: Omit<AnalyticsEventData, 'tim
     if (error.response && error.response.data && error.response.data.error) {
       console.error('Google API Error Details:', JSON.stringify(error.response.data.error, null, 2));
     }
+    // Do not re-throw here, let the calling function decide how to handle failed logging
   }
 }
+

@@ -33,14 +33,17 @@ export default function RootLayout({
               }
 
               console.log("[IFRAME SCRIPT] Message accepted from origin:", event.origin);
-              console.log("[IFRAME SCRIPT] Received message in iframe:", event.data);
+              console.log("[IFRAME SCRIPT] Received message data in iframe:", event.data);
 
               const { referralCode, cookies } = event.data;
 
               if (referralCode) {
                 console.log("[IFRAME SCRIPT] Referral code received via postMessage:", referralCode);
-                localStorage.setItem("referralCode", referralCode);
+                localStorage.setItem("referralCode", referralCode); // Stored as a simple string
                 console.log("[IFRAME SCRIPT] Referral code stored in localStorage under 'referralCode'.");
+                // Dispatch an event so page.tsx can react and re-load data
+                window.dispatchEvent(new CustomEvent('referralCodeUpdated', { detail: { referralCode } }));
+                console.log("[IFRAME SCRIPT] Dispatched 'referralCodeUpdated' event.");
               } else {
                 console.log("[IFRAME SCRIPT] No referralCode property in message data or referralCode is null/empty.");
               }

@@ -14,7 +14,7 @@ import { useIsMobile } from '@/hooks/use-mobile';
 const CLIENT_MAX_GENERATIONS_PER_DAY_BASE = 5;
 const BONUS_GENERATIONS = 5; 
 const CLIENT_USAGE_STORAGE_KEY = 'keywordGeneratorUsage';
-const REFERRAL_CODE_STORAGE_KEY = 'referralCodeData';
+const REFERRAL_CODE_STORAGE_KEY = 'referralCodeData'; // Stores { code: string, expiresAt: number }
 const EMAIL_BONUS_STORAGE_KEY = 'keywordGeneratorEmailBonusData'; 
 const REFERRAL_CODE_EXPIRY_DAYS = 30;
 const COMMUNITY_URL_PLACEHOLDER = 'https://example.com/community'; 
@@ -120,17 +120,20 @@ export default function HomePage() {
       resetClientUsage(); 
     }
 
+    // --- Referral Code Logic ---
     const queryParams = new URLSearchParams(window.location.search);
     const urlReferralCode = queryParams.get('referralCode');
     let activeReferralCode: string | null = null;
 
     if (urlReferralCode) {
+      console.log("[PAGE] Referral code found in URL:", urlReferralCode);
       const newReferralData: ReferralCodeData = {
         code: urlReferralCode,
         expiresAt: now + REFERRAL_CODE_EXPIRY_DAYS * ONE_DAY_MS,
       };
       localStorage.setItem(REFERRAL_CODE_STORAGE_KEY, JSON.stringify(newReferralData));
       activeReferralCode = urlReferralCode;
+      // Log only if it's a *newly applied* URL code
       logAnalyticsEvent({
         eventType: 'referral_code_applied', 
         referralCode: activeReferralCode,
@@ -143,16 +146,43 @@ export default function HomePage() {
           const storedData: ReferralCodeData = JSON.parse(storedReferralString);
           if (now < storedData.expiresAt) {
             activeReferralCode = storedData.code;
+            console.log("[PAGE] Found valid referral code in localStorage (referralCodeData):", activeReferralCode);
           } else {
             localStorage.removeItem(REFERRAL_CODE_STORAGE_KEY);
+            console.log("[PAGE] Expired referral code removed from localStorage (referralCodeData).");
           }
         } catch (e) {
           localStorage.removeItem(REFERRAL_CODE_STORAGE_KEY);
+          console.error("[PAGE] Error parsing referralCodeData, removed from localStorage:", e);
         }
       }
     }
+
+    // Fallback: Check for referral code from postMessage (stored as simple string)
+    if (!activeReferralCode) {
+      const postMessageReferralCode = localStorage.getItem("referralCode"); // Key used by layout.tsx script
+      if (postMessageReferralCode) {
+        console.log("[PAGE] Found referral code from postMessage in localStorage (referralCode string):", postMessageReferralCode);
+        activeReferralCode = postMessageReferralCode;
+        // "Promote" it to the standard object format with expiry
+        const newReferralData: ReferralCodeData = {
+          code: postMessageReferralCode,
+          expiresAt: now + REFERRAL_CODE_EXPIRY_DAYS * ONE_DAY_MS,
+        };
+        localStorage.setItem(REFERRAL_CODE_STORAGE_KEY, JSON.stringify(newReferralData));
+        console.log("[PAGE] Promoted postMessage referral code to standard format in referralCodeData.");
+        // Optionally, remove the simple string version if you want to avoid reprocessing
+        // localStorage.removeItem("referralCode"); 
+         logAnalyticsEvent({ // Log this application as well
+            eventType: 'referral_code_applied', 
+            referralCode: activeReferralCode,
+            isMobile: isMobile,
+         }).catch(console.error);
+      }
+    }
+    
     setStoredReferralCode(activeReferralCode);
-    console.log("Active referral code after loadData:", activeReferralCode);
+    console.log("[PAGE] Final active referral code for this load:", activeReferralCode);
 
   }, [isMobile, resetClientUsage]); 
 
@@ -160,11 +190,14 @@ export default function HomePage() {
     loadDataFromLocalStorage();
 
     const handleReferralCodeUpdate = (event: Event) => {
-      console.log('Custom event "referralCodeUpdated" received in page.tsx');
+      console.log('[PAGE] Custom event "referralCodeUpdated" received.');
       const customEvent = event as CustomEvent<{ referralCode: string }>;
       if (customEvent.detail && customEvent.detail.referralCode) {
-        // Re-run logic to load/update referral code state
+        console.log('[PAGE] Event detail referral code:', customEvent.detail.referralCode);
+        // Re-run logic to load/update referral code state, which will now pick up from "referralCode" localStorage
         loadDataFromLocalStorage();
+      } else {
+        console.log('[PAGE] "referralCodeUpdated" event received, but no referralCode in detail.');
       }
     };
 

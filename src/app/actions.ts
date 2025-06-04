@@ -100,7 +100,7 @@ const SubscribeActionInputSchema = z.object({
   phone: z.string().optional().or(z.literal('')),
   consent: z.boolean().refine(val => val === true, { message: "You must agree to the terms to subscribe." }),
 });
-
+ 
 export async function saveContactDetailsAction(
   data: z.infer<typeof SubscribeActionInputSchema>
 ): Promise<{ success: true } | { success: false; error: string }> {

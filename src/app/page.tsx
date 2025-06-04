@@ -12,44 +12,44 @@ import { LimitReachedPopup } from '@/components/limit-reached-popup';
 import { useIsMobile } from '@/hooks/use-mobile';
 
 const CLIENT_MAX_GENERATIONS_PER_DAY_BASE = 5;
-const BONUS_GENERATIONS = 5; 
+const BONUS_GENERATIONS = 5;
 const CLIENT_USAGE_STORAGE_KEY = 'keywordGeneratorUsage';
-const REFERRAL_CODE_STORAGE_KEY = 'referralCodeData'; // Stores { code: string, expiresAt: number }
-const EMAIL_BONUS_STORAGE_KEY = 'keywordGeneratorEmailBonusData'; 
+const REFERRAL_CODE_STORAGE_KEY = 'referralCodeData';
+const EMAIL_BONUS_STORAGE_KEY = 'keywordGeneratorEmailBonusData';
 const REFERRAL_CODE_EXPIRY_DAYS = 30;
-const COMMUNITY_URL_PLACEHOLDER = 'https://example.com/community'; 
-const PRIVACY_POLICY_URL_PLACEHOLDER = '/privacy-policy'; 
+const COMMUNITY_URL_PLACEHOLDER = 'https://example.com/community';
+const PRIVACY_POLICY_URL_PLACEHOLDER = '/privacy-policy';
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 
 interface ClientUsageData {
-  count: number; 
-  lastReset: number; 
+  count: number;
+  lastReset: number;
 }
 
 interface ReferralCodeData {
   code: string;
-  expiresAt: number; 
+  expiresAt: number;
 }
 
 interface EmailBonusData {
-  grantedInCycleTimestamp: number | null; 
+  grantedInCycleTimestamp: number | null;
 }
 
 export default function HomePage() {
   const [results, setResults] = useState<SuggestKeywordsOutput | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  
+
   const [remainingGenerations, setRemainingGenerations] = useState<number>(CLIENT_MAX_GENERATIONS_PER_DAY_BASE);
   const [maxGenerations, setMaxGenerations] = useState<number>(CLIENT_MAX_GENERATIONS_PER_DAY_BASE);
   const [resetTime, setResetTime] = useState<number | undefined>(undefined);
-  const [isLimitReachedPopupOpen, setIsLimitReachedPopupOpen] = useState(false); 
-  
+  const [isLimitReachedPopupOpen, setIsLimitReachedPopupOpen] = useState(false);
+
   const [storedReferralCode, setStoredReferralCode] = useState<string | null>(null);
 
   const [isSubmittingEmailForBonus, setIsSubmittingEmailForBonus] = useState(false);
   const [emailForBonusError, setEmailForBonusError] = useState<string | null>(null);
-  
+
   const { toast } = useToast();
   const isMobile = useIsMobile();
   const resultsContainerRef = useRef<HTMLDivElement>(null);
@@ -61,12 +61,12 @@ export default function HomePage() {
     setRemainingGenerations(newUsage.count);
     setMaxGenerations(CLIENT_MAX_GENERATIONS_PER_DAY_BASE);
     setResetTime(newUsage.lastReset + ONE_DAY_MS);
-    
+
     const newBonusData: EmailBonusData = { grantedInCycleTimestamp: null };
     localStorage.setItem(EMAIL_BONUS_STORAGE_KEY, JSON.stringify(newBonusData));
-    
-    setIsLimitReachedPopupOpen(false); 
-    console.log("Client usage and bonus eligibility reset. Base generations remaining:", newUsage.count);
+
+    setIsLimitReachedPopupOpen(false);
+    // console.log("[PAGE] Client usage and bonus eligibility reset. Base generations remaining:", newUsage.count);
   }, []);
 
 
@@ -82,7 +82,7 @@ export default function HomePage() {
 
       if (storedUsageString) {
         usage = JSON.parse(storedUsageString);
-        if (now < usage.lastReset + ONE_DAY_MS) { 
+        if (now < usage.lastReset + ONE_DAY_MS) {
           currentRemainingGenerations = usage.count;
           currentResetTime = usage.lastReset + ONE_DAY_MS;
 
@@ -93,17 +93,17 @@ export default function HomePage() {
               currentMaxGenerations = CLIENT_MAX_GENERATIONS_PER_DAY_BASE + BONUS_GENERATIONS;
             }
           }
-        } else { 
-          console.log("Daily limit period expired, resetting usage.");
-          resetClientUsage(); 
+        } else {
+          // console.log("[PAGE] Daily limit period expired, resetting usage.");
+          resetClientUsage();
           const freshUsageString = localStorage.getItem(CLIENT_USAGE_STORAGE_KEY);
           usage = freshUsageString ? JSON.parse(freshUsageString) : { count: CLIENT_MAX_GENERATIONS_PER_DAY_BASE, lastReset: now};
           currentRemainingGenerations = usage.count;
           currentResetTime = usage.lastReset + ONE_DAY_MS;
           currentMaxGenerations = CLIENT_MAX_GENERATIONS_PER_DAY_BASE;
         }
-      } else { 
-        console.log("No usage data found, initializing.");
+      } else {
+        // console.log("[PAGE] No usage data found, initializing.");
         resetClientUsage();
         const freshUsageString = localStorage.getItem(CLIENT_USAGE_STORAGE_KEY);
         usage = freshUsageString ? JSON.parse(freshUsageString) : { count: CLIENT_MAX_GENERATIONS_PER_DAY_BASE, lastReset: now};
@@ -116,29 +116,24 @@ export default function HomePage() {
       setResetTime(currentResetTime);
 
     } catch (e) {
-      console.error("Failed to load usage data from localStorage:", e);
-      resetClientUsage(); 
+      console.error("[PAGE ERROR] Failed to load usage data from localStorage:", e);
+      resetClientUsage();
     }
 
-    // --- Referral Code Logic ---
     const queryParams = new URLSearchParams(window.location.search);
     const urlReferralCode = queryParams.get('referralCode');
     let activeReferralCode: string | null = null;
+    let newlyAppliedByUrl = false;
 
     if (urlReferralCode) {
-      console.log("[PAGE] Referral code found in URL:", urlReferralCode);
+      // console.log("[PAGE] Referral code found in URL:", urlReferralCode);
       const newReferralData: ReferralCodeData = {
         code: urlReferralCode,
         expiresAt: now + REFERRAL_CODE_EXPIRY_DAYS * ONE_DAY_MS,
       };
       localStorage.setItem(REFERRAL_CODE_STORAGE_KEY, JSON.stringify(newReferralData));
       activeReferralCode = urlReferralCode;
-      // Log only if it's a *newly applied* URL code
-      logAnalyticsEvent({
-        eventType: 'referral_code_applied', 
-        referralCode: activeReferralCode,
-        isMobile: isMobile,
-      }).catch(console.error);
+      newlyAppliedByUrl = true;
     } else {
       const storedReferralString = localStorage.getItem(REFERRAL_CODE_STORAGE_KEY);
       if (storedReferralString) {
@@ -146,58 +141,61 @@ export default function HomePage() {
           const storedData: ReferralCodeData = JSON.parse(storedReferralString);
           if (now < storedData.expiresAt) {
             activeReferralCode = storedData.code;
-            console.log("[PAGE] Found valid referral code in localStorage (referralCodeData):", activeReferralCode);
+            // console.log("[PAGE] Found valid referral code in localStorage (referralCodeData):", activeReferralCode);
           } else {
             localStorage.removeItem(REFERRAL_CODE_STORAGE_KEY);
-            console.log("[PAGE] Expired referral code removed from localStorage (referralCodeData).");
+            // console.log("[PAGE] Expired referral code removed from localStorage (referralCodeData).");
           }
         } catch (e) {
           localStorage.removeItem(REFERRAL_CODE_STORAGE_KEY);
-          console.error("[PAGE] Error parsing referralCodeData, removed from localStorage:", e);
+          console.error("[PAGE ERROR] Error parsing referralCodeData, removed from localStorage:", e);
         }
       }
     }
 
-    // Fallback: Check for referral code from postMessage (stored as simple string)
+    let newlyAppliedByPostMessage = false;
     if (!activeReferralCode) {
-      const postMessageReferralCode = localStorage.getItem("referralCode"); // Key used by layout.tsx script
+      const postMessageReferralCode = localStorage.getItem("referralCode");
       if (postMessageReferralCode) {
-        console.log("[PAGE] Found referral code from postMessage in localStorage (referralCode string):", postMessageReferralCode);
+        // console.log("[PAGE] Found referral code from postMessage in localStorage (referralCode string):", postMessageReferralCode);
         activeReferralCode = postMessageReferralCode;
-        // "Promote" it to the standard object format with expiry
         const newReferralData: ReferralCodeData = {
           code: postMessageReferralCode,
           expiresAt: now + REFERRAL_CODE_EXPIRY_DAYS * ONE_DAY_MS,
         };
         localStorage.setItem(REFERRAL_CODE_STORAGE_KEY, JSON.stringify(newReferralData));
-        console.log("[PAGE] Promoted postMessage referral code to standard format in referralCodeData.");
-        // Optionally, remove the simple string version if you want to avoid reprocessing
-        // localStorage.removeItem("referralCode"); 
-         logAnalyticsEvent({ // Log this application as well
-            eventType: 'referral_code_applied', 
-            referralCode: activeReferralCode,
-            isMobile: isMobile,
-         }).catch(console.error);
+        // console.log("[PAGE] Promoted postMessage referral code to standard format in referralCodeData.");
+        newlyAppliedByPostMessage = true;
       }
     }
-    
-    setStoredReferralCode(activeReferralCode);
-    console.log("[PAGE] Final active referral code for this load:", activeReferralCode);
 
-  }, [isMobile, resetClientUsage]); 
+    if (activeReferralCode && (newlyAppliedByUrl || newlyAppliedByPostMessage)) {
+        const eventData = {
+            eventType: 'referral_code_applied' as const,
+            referralCode: activeReferralCode,
+            isMobile: isMobile,
+        };
+        // console.log("[PAGE CLIENT LOG] Logging 'referral_code_applied' event. Data:", JSON.stringify(eventData));
+        logAnalyticsEvent(eventData).catch(err => console.error("[PAGE ERROR] Failed to log 'referral_code_applied' event:", err));
+    }
+
+    setStoredReferralCode(activeReferralCode);
+    // console.log("[PAGE] Final active referral code for this load:", activeReferralCode);
+
+  }, [isMobile, resetClientUsage]);
 
   useEffect(() => {
     loadDataFromLocalStorage();
 
     const handleReferralCodeUpdate = (event: Event) => {
-      console.log('[PAGE] Custom event "referralCodeUpdated" received.');
-      const customEvent = event as CustomEvent<{ referralCode: string }>;
+      // console.log('[PAGE] Custom event "referralCodeUpdated" received.');
+      const customEvent = event as CustomEvent<{ referralCode: string }>; // Assuming detail has referralCode
       if (customEvent.detail && customEvent.detail.referralCode) {
-        console.log('[PAGE] Event detail referral code:', customEvent.detail.referralCode);
-        // Re-run logic to load/update referral code state, which will now pick up from "referralCode" localStorage
-        loadDataFromLocalStorage();
+        // console.log('[PAGE] Event detail referral code:', customEvent.detail.referralCode);
+        loadDataFromLocalStorage(); // Reload to pick up new code from localStorage
       } else {
-        console.log('[PAGE] "referralCodeUpdated" event received, but no referralCode in detail.');
+        // console.log('[PAGE] "referralCodeUpdated" event received, but no referralCode in detail or detail is missing.');
+         loadDataFromLocalStorage(); // Still reload, as the simple "referralCode" might have been set
       }
     };
 
@@ -213,30 +211,30 @@ export default function HomePage() {
     const storedUsageString = localStorage.getItem(CLIENT_USAGE_STORAGE_KEY);
     if (!storedUsageString) {
       resetClientUsage();
-      return CLIENT_MAX_GENERATIONS_PER_DAY_BASE -1 <= 0; 
+      return CLIENT_MAX_GENERATIONS_PER_DAY_BASE -1 <= 0;
     }
     const usage: ClientUsageData = JSON.parse(storedUsageString);
     const newCount = Math.max(0, usage.count - 1);
-    
+
     const newUsage: ClientUsageData = { ...usage, count: newCount };
     localStorage.setItem(CLIENT_USAGE_STORAGE_KEY, JSON.stringify(newUsage));
     setRemainingGenerations(newCount);
-    
-    console.log("Generation recorded. Remaining:", newCount);
-    return newCount <= 0; 
+
+    // console.log("Generation recorded. Remaining:", newCount);
+    return newCount <= 0;
   };
 
 
   const handleGenerateKeywords = async (values: SuggestKeywordsInput) => {
-    setError(null); 
-    setResults(null); 
+    setError(null);
+    setResults(null);
 
     setIsLoading(true);
 
     if (isMobile && resultsContainerRef.current) {
       resultsContainerRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
-    
+
     const currentUsageString = localStorage.getItem(CLIENT_USAGE_STORAGE_KEY);
     const currentUsage: ClientUsageData = currentUsageString ? JSON.parse(currentUsageString) : { count: 0, lastReset: Date.now() };
     const localRemainingGenerations = currentUsage.count;
@@ -245,50 +243,56 @@ export default function HomePage() {
 
     if (wasAlreadyLimited) {
         setIsLimitReachedPopupOpen(true);
-        setIsLoading(false); 
-        logAnalyticsEvent({
-            eventType: 'already_limited_attempt',
+        setIsLoading(false);
+        const eventData = {
+            eventType: 'already_limited_attempt' as const,
             inputMethod: values.inputMethod,
             platform: values.platform,
             inputTextLength: values.inputText.length,
             referralCode: storedReferralCode,
             wasAlreadyLimited: true,
             isMobile: isMobile,
-        }).catch(console.error);
+        };
+        // console.log("[PAGE CLIENT LOG] Logging 'already_limited_attempt' event. Data:", JSON.stringify(eventData));
+        logAnalyticsEvent(eventData).catch(err => console.error("[PAGE ERROR] Failed to log 'already_limited_attempt' event:", err));
         return;
     }
-    
-    logAnalyticsEvent({
-        eventType: 'keyword_generation_attempt',
+
+    const attemptEventData = {
+        eventType: 'keyword_generation_attempt' as const,
         inputMethod: values.inputMethod,
         platform: values.platform,
         inputTextLength: values.inputText.length,
         referralCode: storedReferralCode,
         wasAlreadyLimited: false,
         isMobile: isMobile,
-    }).catch(console.error);
-    
+    };
+    // console.log("[PAGE CLIENT LOG] Logging 'keyword_generation_attempt' event. Data:", JSON.stringify(attemptEventData));
+    logAnalyticsEvent(attemptEventData).catch(err => console.error("[PAGE ERROR] Failed to log 'keyword_generation_attempt' event:", err));
+
     const response = await getKeywordsAction(values);
     let dailyLimitReachedThisAttempt = false;
 
     if (response.success) {
       setResults(response.data);
-      dailyLimitReachedThisAttempt = recordClientGeneration(); 
+      dailyLimitReachedThisAttempt = recordClientGeneration();
       toast({
         title: "Keywords Generated!",
         description: "Successfully fetched keyword suggestions.",
       });
-      logAnalyticsEvent({
-        eventType: 'keyword_generation_success',
+      const successEventData = {
+        eventType: 'keyword_generation_success' as const,
         inputMethod: values.inputMethod,
         platform: values.platform,
         inputTextLength: values.inputText.length,
         numberOfKeywordsGenerated: response.data.keywords.length,
         referralCode: storedReferralCode,
         dailyLimitReachedThisAttempt: dailyLimitReachedThisAttempt,
-        wasAlreadyLimited: false, 
+        wasAlreadyLimited: false,
         isMobile: isMobile,
-      }).catch(console.error);
+      };
+      // console.log("[PAGE CLIENT LOG] Logging 'keyword_generation_success' event. Data:", JSON.stringify(successEventData));
+      logAnalyticsEvent(successEventData).catch(err => console.error("[PAGE ERROR] Failed to log 'keyword_generation_success' event:", err));
     } else {
       setError(response.error);
       toast({
@@ -296,8 +300,8 @@ export default function HomePage() {
         title: "Error Generating Keywords",
         description: response.error,
       });
-       logAnalyticsEvent({
-        eventType: 'keyword_generation_failure',
+       const failureEventData = {
+        eventType: 'keyword_generation_failure' as const,
         inputMethod: values.inputMethod,
         platform: values.platform,
         inputTextLength: values.inputText.length,
@@ -305,14 +309,16 @@ export default function HomePage() {
         wasAlreadyLimited: false,
         isMobile: isMobile,
         errorMessage: response.error,
-      }).catch(console.error);
+      };
+      // console.log("[PAGE CLIENT LOG] Logging 'keyword_generation_failure' event. Data:", JSON.stringify(failureEventData));
+      logAnalyticsEvent(failureEventData).catch(err => console.error("[PAGE ERROR] Failed to log 'keyword_generation_failure' event:", err));
     }
     setIsLoading(false);
 
     if (dailyLimitReachedThisAttempt) {
         setIsLimitReachedPopupOpen(true);
-        logAnalyticsEvent({
-          eventType: 'limit_hit_on_attempt',
+        const limitHitEventData = {
+          eventType: 'limit_hit_on_attempt' as const,
           inputMethod: values.inputMethod,
           platform: values.platform,
           inputTextLength: values.inputText.length,
@@ -320,7 +326,9 @@ export default function HomePage() {
           dailyLimitReachedThisAttempt: true,
           wasAlreadyLimited: false,
           isMobile: isMobile,
-        }).catch(console.error);
+        };
+        // console.log("[PAGE CLIENT LOG] Logging 'limit_hit_on_attempt' event. Data:", JSON.stringify(limitHitEventData));
+        logAnalyticsEvent(limitHitEventData).catch(err => console.error("[PAGE ERROR] Failed to log 'limit_hit_on_attempt' event:", err));
     }
   };
 
@@ -328,7 +336,7 @@ export default function HomePage() {
     setIsSubmittingEmailForBonus(true);
     setEmailForBonusError(null);
 
-    const response = await saveContactDetailsAction({ email, consent: true }); 
+    const response = await saveContactDetailsAction({ email, consent: true });
 
     if (response.success) {
       toast({
@@ -340,23 +348,25 @@ export default function HomePage() {
       if (storedUsageString) {
         const usage: ClientUsageData = JSON.parse(storedUsageString);
         const newRemaining = Math.min(usage.count + BONUS_GENERATIONS, CLIENT_MAX_GENERATIONS_PER_DAY_BASE + BONUS_GENERATIONS);
-        
+
         const updatedUsage: ClientUsageData = { ...usage, count: newRemaining };
         localStorage.setItem(CLIENT_USAGE_STORAGE_KEY, JSON.stringify(updatedUsage));
-        
+
         const newBonusData: EmailBonusData = { grantedInCycleTimestamp: usage.lastReset };
         localStorage.setItem(EMAIL_BONUS_STORAGE_KEY, JSON.stringify(newBonusData));
 
         setRemainingGenerations(newRemaining);
         setMaxGenerations(CLIENT_MAX_GENERATIONS_PER_DAY_BASE + BONUS_GENERATIONS);
       }
-      
-      logAnalyticsEvent({
-        eventType: 'contact_details_submitted', 
+
+      const contactEventData = {
+        eventType: 'contact_details_submitted' as const,
         email: email,
         referralCode: storedReferralCode,
         isMobile: isMobile,
-      }).catch(console.error);
+      };
+      // console.log("[PAGE CLIENT LOG] Logging 'contact_details_submitted' event. Data:", JSON.stringify(contactEventData));
+      logAnalyticsEvent(contactEventData).catch(err => console.error("[PAGE ERROR] Failed to log 'contact_details_submitted' event:", err));
 
       setIsLimitReachedPopupOpen(false);
       setIsSubmittingEmailForBonus(false);
@@ -382,22 +392,22 @@ export default function HomePage() {
               Try it out with {CLIENT_MAX_GENERATIONS_PER_DAY_BASE} free keyword generations daily, which reset every 24 hours. Reached your limit? You can get {BONUS_GENERATIONS} bonus generations.
             </p>
           </div>
-          
+
           <div className="grid md:grid-cols-2 gap-8 items-stretch">
             <div className="bg-card p-6 sm:p-8 rounded-xl shadow-xl h-full flex flex-col">
-              <KeywordForm 
-                onSubmit={handleGenerateKeywords} 
+              <KeywordForm
+                onSubmit={handleGenerateKeywords}
                 isLoading={isLoading}
                 remainingGenerations={remainingGenerations}
                 maxGenerations={maxGenerations}
                 resetTime={resetTime}
               />
             </div>
-            
+
             <div ref={resultsContainerRef} className="h-full flex flex-col">
-              <KeywordResults 
-                results={results} 
-                isLoading={isLoading && (results === null)} 
+              <KeywordResults
+                results={results}
+                isLoading={isLoading && (results === null)}
                 error={error}
               />
             </div>
@@ -420,5 +430,3 @@ export default function HomePage() {
     </div>
   );
 }
-
-    

@@ -22,6 +22,7 @@ export async function getKeywordsAction(
     if (!validationResult.success) {
       const errorMessage = validationResult.error.errors.map(e => e.message).join(', ');
       try {
+        // console.log("[ACTION DEBUG] Logging validation_failure event from getKeywordsAction");
         await logAnalyticsEvent({
           eventType: 'keyword_generation_failure',
           inputMethod: data.inputMethod,
@@ -29,8 +30,8 @@ export async function getKeywordsAction(
           inputTextLength: data.inputText?.length || 0,
           errorMessage: `Validation Error: ${errorMessage}`,
         });
-      } catch (logErr) {
-        console.error("Failed to log validation_failure event:", logErr);
+      } catch (logErr: any) {
+        console.error("[ACTION ERROR] Failed to log validation_failure event in getKeywordsAction:", logErr.message || String(logErr));
       }
       return {
         success: false,
@@ -45,8 +46,8 @@ export async function getKeywordsAction(
         data: result
       };
     } else {
-      // It's good practice to log if the AI returned an unexpected (but not erroring) result
       try {
+        // console.log("[ACTION DEBUG] Logging AI unexpected result event from getKeywordsAction");
         await logAnalyticsEvent({
           eventType: 'keyword_generation_failure',
           inputMethod: validationResult.data.inputMethod,
@@ -54,8 +55,8 @@ export async function getKeywordsAction(
           inputTextLength: validationResult.data.inputText.length,
           errorMessage: 'AI returned unexpected result (no keywords or falsy result)',
         });
-      } catch (logErr) {
-          console.error("Failed to log AI unexpected result event:", logErr);
+      } catch (logErr: any) {
+          console.error("[ACTION ERROR] Failed to log AI unexpected result event in getKeywordsAction:", logErr.message || String(logErr));
       }
       return {
         success: false,
@@ -63,7 +64,7 @@ export async function getKeywordsAction(
       };
     }
   } catch (e: any) {
-    console.error("Outer unhandled error in getKeywordsAction:", e);
+    console.error("[ACTION CRITICAL] Outer unhandled error in getKeywordsAction:", e);
 
     let originalErrorMessage = "Unknown error from action";
     if (e instanceof Error) {
@@ -78,26 +79,25 @@ export async function getKeywordsAction(
       }
     }
 
-    // Attempt to log the failure, but don't let this logging crash the action
     try {
+      // console.log("[ACTION DEBUG] Logging critical_failure event from getKeywordsAction's outer catch");
       await logAnalyticsEvent({
         eventType: 'keyword_generation_failure',
         errorMessage: `Critical Action Error: ${originalErrorMessage}`,
-        inputMethod: data?.inputMethod, // data might be null if error happened before validation
+        inputMethod: data?.inputMethod,
         platform: data?.platform,
         inputTextLength: data?.inputText?.length,
       });
     } catch (loggingError: any) {
-      console.error("Failed to log critical_failure event during getKeywordsAction error handling. Logging error: ", loggingError?.message || String(loggingError));
+      console.error("[ACTION ERROR] Failed to log critical_failure event during getKeywordsAction error handling. Logging error: ", loggingError?.message || String(loggingError));
     }
-    // ALWAYS return a JSON response
     return { success: false, error: "An unexpected server error occurred while generating keywords. Please try again." };
   }
 }
 
 const SubscribeActionInputSchema = z.object({
   email: z.string().email({ message: "Please enter a valid email address." }),
-  phone: z.string().optional().or(z.literal('')), // Optional, can be empty string
+  phone: z.string().optional().or(z.literal('')),
   consent: z.boolean().refine(val => val === true, { message: "You must agree to the terms to subscribe." }),
 });
 
@@ -112,40 +112,39 @@ export async function saveContactDetailsAction(
 
     const { email, phone } = validationResult.data;
 
-    // Log to Google Sheets
+    // console.log("[ACTION DEBUG] Logging contact_details_submitted event from saveContactDetailsAction");
     await logAnalyticsEvent({
       eventType: 'contact_details_submitted',
       email: email,
-      phone: phone || '', 
+      phone: phone || '',
     });
 
-    console.log('Contact Details Submitted & Logged:');
-    console.log('Email:', email);
-    if (phone) {
-      console.log('Phone:', phone);
-    }
-    console.log('Reminder: PII (email, phone) is now being sent to your analytics Google Sheet.');
-    console.log('For production, consider a separate, secure datastore for PII.');
-
+    // console.log('[ACTION INFO] Contact Details Submitted & Logged by saveContactDetailsAction:');
+    // console.log('[ACTION INFO] Email:', email);
+    // if (phone) {
+    //   console.log('[ACTION INFO] Phone:', phone);
+    // }
+    // console.log('[ACTION INFO] Reminder: PII (email, phone) is now being sent to your analytics Google Sheet.');
+    // console.log('[ACTION INFO] For production, consider a separate, secure datastore for PII.');
 
     return { success: true };
   } catch (error: any) {
-    console.error('Error in saveContactDetailsAction:', error);
+    console.error('[ACTION CRITICAL] Error in saveContactDetailsAction:', error);
     const originalErrorMessage = error.message || 'Unknown error in saveContactDetailsAction';
     try {
+        // console.log("[ACTION DEBUG] Logging contact_submission_failure event from saveContactDetailsAction's catch");
         await logAnalyticsEvent({
-        eventType: 'keyword_generation_failure', 
+        eventType: 'keyword_generation_failure',
         errorMessage: `Error in saveContactDetailsAction: ${originalErrorMessage}`,
         });
     } catch (logErr: any) {
-        console.error("Failed to log contact_submission_failure event. Logging error:", logErr?.message || String(logErr));
+        console.error("[ACTION ERROR] Failed to log contact_submission_failure event. Logging error:", logErr?.message || String(logErr));
     }
     return { success: false, error: 'An unexpected server error occurred while saving your details.' };
   }
 }
 
 
-// Define the types for the analytics event data
 interface AnalyticsEventData {
   timestamp: string;
   eventType: 'keyword_generation_attempt' | 'keyword_generation_success' | 'keyword_generation_failure' | 'limit_hit_on_attempt' | 'already_limited_attempt' | 'referral_code_applied' | 'contact_details_submitted';
@@ -158,44 +157,49 @@ interface AnalyticsEventData {
   wasAlreadyLimited?: boolean;
   isMobile?: boolean;
   errorMessage?: string;
-  email?: string; 
-  phone?: string; 
+  email?: string;
+  phone?: string;
 }
 
-/**
- * Server Action to log analytics events to Google Sheets.
- */
 export async function logAnalyticsEvent(eventData: Omit<AnalyticsEventData, 'timestamp'>): Promise<void> {
   const completeEventData: AnalyticsEventData = {
     ...eventData,
     timestamp: new Date().toISOString(),
   };
 
-  console.log('Attempting to log analytics event:', JSON.stringify(completeEventData, null, 2));
+  console.log('[LOG ANALYTICS] Attempting to log event. Data:', JSON.stringify(completeEventData, null, 2));
 
-  if (typeof process.env.GOOGLE_SHEETS_CLIENT_EMAIL !== 'string' || process.env.GOOGLE_SHEETS_CLIENT_EMAIL.trim() === '' ||
-      typeof process.env.GOOGLE_SHEETS_PRIVATE_KEY !== 'string' || process.env.GOOGLE_SHEETS_PRIVATE_KEY.trim() === '' ||
-      typeof process.env.GOOGLE_SPREADSHEET_ID !== 'string' || process.env.GOOGLE_SPREADSHEET_ID.trim() === '') {
-    console.warn('Google Sheets API credentials or Spreadsheet ID are not set or empty in environment variables. Skipping Google Sheets logging.');
+  const clientEmail = process.env.GOOGLE_SHEETS_CLIENT_EMAIL;
+  const privateKey = process.env.GOOGLE_SHEETS_PRIVATE_KEY;
+  const spreadsheetId = process.env.GOOGLE_SPREADSHEET_ID;
+
+  // console.log(`[LOG ANALYTICS ENV] GOOGLE_SHEETS_CLIENT_EMAIL is set: ${!!clientEmail}`);
+  // console.log(`[LOG ANALYTICS ENV] GOOGLE_SHEETS_PRIVATE_KEY is set: ${!!privateKey}`);
+  // console.log(`[LOG ANALYTICS ENV] GOOGLE_SPREADSHEET_ID: ${spreadsheetId}`);
+
+
+  if (!clientEmail || clientEmail.trim() === '' ||
+      !privateKey || privateKey.trim() === '' ||
+      !spreadsheetId || spreadsheetId.trim() === '') {
+    console.warn('[LOG ANALYTICS WARN] Google Sheets API credentials or Spreadsheet ID are not set or empty in environment variables. Skipping Google Sheets logging.');
     return;
   }
-  if (process.env.GOOGLE_SPREADSHEET_ID === "YOUR_SPREADSHEET_ID_HERE") {
-    console.warn('GOOGLE_SPREADSHEET_ID is still set to placeholder. Skipping Google Sheets logging.');
+  if (spreadsheetId === "YOUR_SPREADSHEET_ID_HERE") {
+    console.warn('[LOG ANALYTICS WARN] GOOGLE_SPREADSHEET_ID is still set to placeholder "YOUR_SPREADSHEET_ID_HERE". Skipping Google Sheets logging.');
     return;
   }
 
   try {
     const auth = new google.auth.GoogleAuth({
       credentials: {
-        client_email: process.env.GOOGLE_SHEETS_CLIENT_EMAIL,
-        private_key: process.env.GOOGLE_SHEETS_PRIVATE_KEY.replace(/\\n/g, '\n'),
+        client_email: clientEmail,
+        private_key: privateKey.replace(/\\n/g, '\n'),
       },
       scopes: ['https://www.googleapis.com/auth/spreadsheets'],
     });
 
     const sheets = google.sheets({ version: 'v4', auth });
-    const spreadsheetId = process.env.GOOGLE_SPREADSHEET_ID;
-    const range = 'Sheet1!A:M'; // Adjusted for 13 columns (A to M)
+    const range = 'Sheet1!A:M';
 
     const values = [[
       completeEventData.timestamp,
@@ -209,10 +213,11 @@ export async function logAnalyticsEvent(eventData: Omit<AnalyticsEventData, 'tim
       completeEventData.wasAlreadyLimited !== undefined ? completeEventData.wasAlreadyLimited : '',
       completeEventData.isMobile !== undefined ? completeEventData.isMobile : '',
       completeEventData.errorMessage || '',
-      completeEventData.email || '', 
-      completeEventData.phone || '', 
+      completeEventData.email || '',
+      completeEventData.phone || '',
     ]];
 
+    // console.log('[LOG ANALYTICS] Appending values to Google Sheet:', JSON.stringify(values));
     await sheets.spreadsheets.values.append({
       spreadsheetId,
       range,
@@ -221,14 +226,14 @@ export async function logAnalyticsEvent(eventData: Omit<AnalyticsEventData, 'tim
         values,
       },
     });
-    console.log('Successfully logged event to Google Sheet.');
+    console.log('[LOG ANALYTICS] Successfully logged event to Google Sheet.');
 
   } catch (error: any) {
-    console.error('Error during Google Sheets API interaction in logAnalyticsEvent:', error);
+    console.error('[LOG ANALYTICS ERROR] Error during Google Sheets API interaction:', error.message);
     if (error.response && error.response.data && error.response.data.error) {
-      console.error('Google API Error Details:', JSON.stringify(error.response.data.error, null, 2));
+      console.error('[LOG ANALYTICS ERROR] Google API Error Details:', JSON.stringify(error.response.data.error, null, 2));
+    } else if (error.errors) { // Sometimes Google API errors come in an array
+        console.error('[LOG ANALYTICS ERROR] Google API Error Array:', JSON.stringify(error.errors, null, 2));
     }
-    // Do not re-throw here, let the calling function decide how to handle failed logging
   }
 }
-

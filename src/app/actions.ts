@@ -173,30 +173,39 @@ export async function logAnalyticsEvent(eventData: Omit<AnalyticsEventData, 'tim
   console.log('[LOG ANALYTICS] Attempting to log event. Data:', JSON.stringify(completeEventData, null, 2));
 
   const clientEmail = process.env.GOOGLE_SHEETS_CLIENT_EMAIL;
-  const privateKey = process.env.GOOGLE_SHEETS_PRIVATE_KEY;
+  const privateKeyRaw = process.env.GOOGLE_SHEETS_PRIVATE_KEY;
   const spreadsheetId = process.env.GOOGLE_SPREADSHEET_ID;
 
-  // console.log(`[LOG ANALYTICS ENV] GOOGLE_SHEETS_CLIENT_EMAIL is set: ${!!clientEmail}`);
-  // console.log(`[LOG ANALYTICS ENV] GOOGLE_SHEETS_PRIVATE_KEY is set: ${!!privateKey}`);
-  // console.log(`[LOG ANALYTICS ENV] GOOGLE_SPREADSHEET_ID: ${spreadsheetId}`);
+  console.log(`[LOG ANALYTICS ENV] GOOGLE_SHEETS_CLIENT_EMAIL is set: ${!!clientEmail}`);
+  console.log(`[LOG ANALYTICS ENV] GOOGLE_SHEETS_PRIVATE_KEY is set: ${!!privateKeyRaw}`);
+  if (privateKeyRaw) {
+    console.log(`[LOG ANALYTICS ENV DEBUG] Raw Private Key Start: "${privateKeyRaw.substring(0, 30)}..."`);
+    console.log(`[LOG ANALYTICS ENV DEBUG] Raw Private Key End: "...${privateKeyRaw.substring(privateKeyRaw.length - 30)}"`);
+  }
+  console.log(`[LOG ANALYTICS ENV] GOOGLE_SPREADSHEET_ID: ${spreadsheetId}`);
 
 
   if (!clientEmail || clientEmail.trim() === '' ||
-      !privateKey || privateKey.trim() === '' ||
+      !privateKeyRaw || privateKeyRaw.trim() === '' ||
       !spreadsheetId || spreadsheetId.trim() === '') {
     console.warn('[LOG ANALYTICS WARN] Google Sheets API credentials or Spreadsheet ID are not set or empty in environment variables. Skipping Google Sheets logging.');
     return;
   }
-  if (spreadsheetId === "YOUR_SPREADSHEET_ID_HERE") { // This check remains important
+  if (spreadsheetId === "YOUR_SPREADSHEET_ID_HERE") { 
     console.warn('[LOG ANALYTICS WARN] GOOGLE_SPREADSHEET_ID is still set to placeholder "YOUR_SPREADSHEET_ID_HERE". Skipping Google Sheets logging.');
     return;
   }
 
+  const privateKeyFormatted = privateKeyRaw.replace(/\\n/g, '\n');
+
   try {
+    console.log('[LOG ANALYTICS DEBUG] Using Client Email for Auth:', clientEmail);
+    // console.log('[LOG ANALYTICS DEBUG] Using Formatted Private Key for Auth:', privateKeyFormatted); // Avoid logging full key
+
     const auth = new google.auth.GoogleAuth({
       credentials: {
         client_email: clientEmail,
-        private_key: privateKey.replace(/\\n/g, '\n'), // Essential for correct key formatting from env var
+        private_key: privateKeyFormatted, 
       },
       scopes: ['https://www.googleapis.com/auth/spreadsheets'],
     });
@@ -238,11 +247,13 @@ export async function logAnalyticsEvent(eventData: Omit<AnalyticsEventData, 'tim
       This STRONGLY indicates an issue with the GOOGLE_SHEETS_PRIVATE_KEY format in your Vercel (or other hosting) environment variables.
       PLEASE DOUBLE-CHECK:
       1. The GOOGLE_SHEETS_PRIVATE_KEY in Vercel must be the *exact* string from your service account JSON file.
-      2. It must start with '-----BEGIN PRIVATE KEY-----' and end with '-----END PRIVATE KEY-----\\n'.
-      3. Ensure all newline characters (\\n) are correctly preserved or represented as literal '\\n' in the Vercel environment variable setting.
-      4. The key should not be malformed, truncated, or have extra characters.
-      Your code's 'privateKey.replace(/\\n/g, \'\\n\')' attempts to correct common escaping issues, but the original environment variable in Vercel must be as intact as possible.
-      Current private key presence: ${!!privateKey}`);
+      2. It must start with '-----BEGIN PRIVATE KEY-----' and end with '-----END PRIVATE KEY-----\\n'. (The final '\\n' is critical).
+      3. Ensure all newline characters (\\n) within the key are correctly preserved or represented as literal '\\n' if your env var system requires that (Vercel usually handles direct paste well).
+      4. The key should not be malformed, truncated, or have extra characters like surrounding quotes from the JSON.
+      5. Your code's 'privateKey.replace(/\\n/g, \'\\n\')' attempts to correct common escaping issues, but the original environment variable in Vercel must be as intact as possible.
+      Current raw private key presence: ${!!privateKeyRaw}. 
+      Raw Private Key Start (first 30 chars): "${privateKeyRaw?.substring(0, 30)}..."
+      Raw Private Key End (last 30 chars): "...${privateKeyRaw?.substring(privateKeyRaw.length - 30)}"`);
     }
     if (error.response && error.response.data && error.response.data.error) {
       console.error('[LOG ANALYTICS ERROR] Google API Error Details:', JSON.stringify(error.response.data.error, null, 2));
@@ -254,3 +265,5 @@ export async function logAnalyticsEvent(eventData: Omit<AnalyticsEventData, 'tim
     
 
   
+
+    

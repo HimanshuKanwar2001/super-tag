@@ -23,12 +23,7 @@ export default function RootLayout({
         <Toaster />
         <Script id="superprofile-message-listener" strategy="afterInteractive">
           {`
-            const REFERRAL_CODE_STORAGE_KEY_SCRIPT = 'referralCodeData';
-            const REFERRAL_CODE_EXPIRY_DAYS_SCRIPT = 30;
-            const ONE_DAY_MS_SCRIPT = 24 * 60 * 60 * 1000;
-
-            console.log('[IFRAME SCRIPT] Message listener loaded.');
-
+            console.log('[IFRAME SCRIPT] Message listener attempting to load.');
             window.addEventListener("message", function (event) {
               console.log('[IFRAME SCRIPT] Message received:', event);
               // IMPORTANT: Always verify the origin of the message for security.
@@ -38,30 +33,27 @@ export default function RootLayout({
               }
 
               console.log("[IFRAME SCRIPT] Message accepted from origin:", event.origin);
-              console.log("[IFRAME SCRIPT] Message data:", event.data);
+              console.log("[IFRAME SCRIPT] Received message in iframe:", event.data);
 
-              if (event.data && typeof event.data === 'object') {
-                const { referralCode } = event.data; // Assuming referralCode is directly in event.data
-                if (referralCode) {
-                  console.log("[IFRAME SCRIPT] Referral code received via postMessage:", referralCode);
+              const { referralCode, cookies } = event.data;
 
-                  const newReferralData = {
-                    code: referralCode,
-                    expiresAt: Date.now() + REFERRAL_CODE_EXPIRY_DAYS_SCRIPT * ONE_DAY_MS_SCRIPT,
-                  };
-                  localStorage.setItem(REFERRAL_CODE_STORAGE_KEY_SCRIPT, JSON.stringify(newReferralData));
-                  console.log("[IFRAME SCRIPT] Referral code stored in localStorage:", newReferralData);
-
-                  // Dispatch a custom event so the application can react
-                  window.dispatchEvent(new CustomEvent('referralCodeUpdated', { detail: { referralCode } }));
-                  console.log("[IFRAME SCRIPT] Dispatched 'referralCodeUpdated' event.");
-                } else {
-                  console.log("[IFRAME SCRIPT] No referralCode property in message data or referralCode is null/empty.");
-                }
+              if (referralCode) {
+                console.log("[IFRAME SCRIPT] Referral code received via postMessage:", referralCode);
+                localStorage.setItem("referralCode", referralCode);
+                console.log("[IFRAME SCRIPT] Referral code stored in localStorage under 'referralCode'.");
               } else {
-                console.log("[IFRAME SCRIPT] Message data is not an object or is null.");
+                console.log("[IFRAME SCRIPT] No referralCode property in message data or referralCode is null/empty.");
+              }
+
+              if (cookies) {
+                console.log("[IFRAME SCRIPT] Cookies received via postMessage:", cookies);
+                localStorage.setItem("cookiesFromParent", cookies);
+                console.log("[IFRAME SCRIPT] Cookies stored in localStorage under 'cookiesFromParent'.");
+              } else {
+                console.log("[IFRAME SCRIPT] No cookies property in message data or cookies are null/empty.");
               }
             });
+            console.log('[IFRAME SCRIPT] Message listener loaded and attached.');
           `}
         </Script>
       </body>

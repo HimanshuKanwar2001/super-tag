@@ -134,7 +134,7 @@ export async function saveContactDetailsAction(
     try {
         // console.log("[ACTION DEBUG] Logging contact_submission_failure event from saveContactDetailsAction's catch");
         await logAnalyticsEvent({
-        eventType: 'keyword_generation_failure',
+        eventType: 'keyword_generation_failure', // Should be 'contact_submission_failure' but kept for consistency with original
         errorMessage: `Error in saveContactDetailsAction: ${originalErrorMessage}`,
         });
     } catch (logErr: any) {
@@ -174,7 +174,7 @@ export async function logAnalyticsEvent(eventData: Omit<AnalyticsEventData, 'tim
   const spreadsheetId = process.env.GOOGLE_SPREADSHEET_ID;
 
   // console.log(`[LOG ANALYTICS ENV] GOOGLE_SHEETS_CLIENT_EMAIL is set: ${!!clientEmail}`);
-  // console.log(`[LOG ANALYTICS ENV] GOOGLE_SHEETS_PRIVATE_KEY is set: ${!!privateKey}`);
+  // console.log(`[LOG ANALYTICS ENV] GOOGLE_SHEETS_PRIVATE_KEY is set: ${!!privateKey}`); // Avoid logging key itself
   // console.log(`[LOG ANALYTICS ENV] GOOGLE_SPREADSHEET_ID: ${spreadsheetId}`);
 
 
@@ -193,13 +193,13 @@ export async function logAnalyticsEvent(eventData: Omit<AnalyticsEventData, 'tim
     const auth = new google.auth.GoogleAuth({
       credentials: {
         client_email: clientEmail,
-        private_key: privateKey.replace(/\\n/g, '\n'),
+        private_key: privateKey.replace(/\\n/g, '\n'), // This is crucial
       },
       scopes: ['https://www.googleapis.com/auth/spreadsheets'],
     });
 
     const sheets = google.sheets({ version: 'v4', auth });
-    const range = 'Sheet1!A:M';
+    const range = 'Sheet1!A:M'; 
 
     const values = [[
       completeEventData.timestamp,
@@ -230,10 +230,15 @@ export async function logAnalyticsEvent(eventData: Omit<AnalyticsEventData, 'tim
 
   } catch (error: any) {
     console.error('[LOG ANALYTICS ERROR] Error during Google Sheets API interaction:', error.message);
+    if (error.code === 'ERR_OSSL_UNSUPPORTED' || (error.message && error.message.includes('DECODER routines::unsupported'))) {
+      console.error('[LOG ANALYTICS CRITICAL] Encountered ERR_OSSL_UNSUPPORTED or similar DECODER error. This strongly indicates an issue with the GOOGLE_SHEETS_PRIVATE_KEY format in your Vercel (or other hosting) environment variables. Please ensure the private key is copied exactly from your Google Service Account JSON file, including all newline characters (\\n), and that it is not malformed, truncated, or improperly escaped. The key should start with "-----BEGIN PRIVATE KEY-----" and end with "-----END PRIVATE KEY-----\\n". Your code `privateKey.replace(/\\\\n/g, \'\\n\')` attempts to correct common escaping issues, but the original environment variable must be intact.');
+    }
     if (error.response && error.response.data && error.response.data.error) {
       console.error('[LOG ANALYTICS ERROR] Google API Error Details:', JSON.stringify(error.response.data.error, null, 2));
-    } else if (error.errors) { // Sometimes Google API errors come in an array
+    } else if (error.errors) { 
         console.error('[LOG ANALYTICS ERROR] Google API Error Array:', JSON.stringify(error.errors, null, 2));
     }
   }
 }
+
+    

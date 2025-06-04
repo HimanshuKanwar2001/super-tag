@@ -1,3 +1,4 @@
+
 import type {NextConfig} from 'next';
 
 const nextConfig: NextConfig = {
@@ -15,6 +16,9 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  experimental: {
+    allowedDevOrigins: ["6000-firebase-studio-1748507750147.cluster-nzwlpk54dvagsxetkvxzbvslyi.cloudworkstations.dev"],
+  }
 };
 
 export default nextConfig;

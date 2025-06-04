@@ -15,7 +15,7 @@ const CLIENT_MAX_GENERATIONS_PER_DAY_BASE = 5;
 const BONUS_GENERATIONS = 5;
 const CLIENT_USAGE_STORAGE_KEY = 'keywordGeneratorUsage';
 const REFERRAL_CODE_STORAGE_KEY = 'referralCodeData';
-const EMAIL_BONUS_STORAGE_KEY = 'keywordGeneratorEmailBonusData'; // New key for bonus tracking
+const EMAIL_BONUS_STORAGE_KEY = 'keywordGeneratorEmailBonusData';
 const REFERRAL_CODE_EXPIRY_DAYS = 30;
 const COMMUNITY_URL_PLACEHOLDER = 'https://example.com/community';
 const PRIVACY_POLICY_URL_PLACEHOLDER = '/privacy-policy';
@@ -31,9 +31,8 @@ interface ReferralCodeData {
   expiresAt: number;
 }
 
-// Interface for tracking email bonus
 interface EmailBonusData {
-  grantedInCycleTimestamp: number | null; // Stores the 'lastReset' timestamp when bonus was granted
+  grantedInCycleTimestamp: number | null;
 }
 
 export default function HomePage() {
@@ -45,6 +44,7 @@ export default function HomePage() {
   const [maxGenerations, setMaxGenerations] = useState<number>(CLIENT_MAX_GENERATIONS_PER_DAY_BASE);
   const [resetTime, setResetTime] = useState<number | undefined>(undefined);
   const [isLimitReachedPopupOpen, setIsLimitReachedPopupOpen] = useState(false);
+  const [bonusClaimedThisCycle, setBonusClaimedThisCycle] = useState(false);
 
   const [storedReferralCode, setStoredReferralCode] = useState<string | null>(null);
 
@@ -60,13 +60,13 @@ export default function HomePage() {
     const newUsage: ClientUsageData = { count: CLIENT_MAX_GENERATIONS_PER_DAY_BASE, lastReset: now };
     localStorage.setItem(CLIENT_USAGE_STORAGE_KEY, JSON.stringify(newUsage));
     
-    // Reset email bonus tracking for the new cycle
     const newBonusData: EmailBonusData = { grantedInCycleTimestamp: null };
     localStorage.setItem(EMAIL_BONUS_STORAGE_KEY, JSON.stringify(newBonusData));
 
     setRemainingGenerations(newUsage.count);
-    setMaxGenerations(CLIENT_MAX_GENERATIONS_PER_DAY_BASE); // Max generations initially is base
+    setMaxGenerations(CLIENT_MAX_GENERATIONS_PER_DAY_BASE);
     setResetTime(newUsage.lastReset + ONE_DAY_MS);
+    setBonusClaimedThisCycle(false);
 
     setIsLimitReachedPopupOpen(false);
   }, []);
@@ -77,8 +77,8 @@ export default function HomePage() {
     let currentMaxGenerations = CLIENT_MAX_GENERATIONS_PER_DAY_BASE;
     let currentRemainingGenerations = CLIENT_MAX_GENERATIONS_PER_DAY_BASE;
     let currentResetTime = now + ONE_DAY_MS;
+    let currentBonusClaimed = false;
 
-    // Initialize EMAIL_BONUS_STORAGE_KEY if it doesn't exist
     if (!localStorage.getItem(EMAIL_BONUS_STORAGE_KEY)) {
       const initialBonusData: EmailBonusData = { grantedInCycleTimestamp: null };
       localStorage.setItem(EMAIL_BONUS_STORAGE_KEY, JSON.stringify(initialBonusData));
@@ -90,44 +90,42 @@ export default function HomePage() {
 
       if (storedUsageString) {
         usage = JSON.parse(storedUsageString);
-        if (now < usage.lastReset + ONE_DAY_MS) { // Still within current cycle
+        if (now < usage.lastReset + ONE_DAY_MS) {
           currentRemainingGenerations = usage.count;
           currentResetTime = usage.lastReset + ONE_DAY_MS;
 
-          // Check if bonus was granted in this cycle
           const storedBonusString = localStorage.getItem(EMAIL_BONUS_STORAGE_KEY);
           if (storedBonusString) {
             const bonusData: EmailBonusData = JSON.parse(storedBonusString);
             if (bonusData.grantedInCycleTimestamp === usage.lastReset) {
               currentMaxGenerations = CLIENT_MAX_GENERATIONS_PER_DAY_BASE + BONUS_GENERATIONS;
+              currentBonusClaimed = true;
             }
           }
-        } else { // Cycle expired
-          resetClientUsage(); // This also resets bonus eligibility
-          const freshUsageString = localStorage.getItem(CLIENT_USAGE_STORAGE_KEY); // Read fresh data after reset
+        } else {
+          resetClientUsage();
+          const freshUsageString = localStorage.getItem(CLIENT_USAGE_STORAGE_KEY);
           usage = freshUsageString ? JSON.parse(freshUsageString) : { count: CLIENT_MAX_GENERATIONS_PER_DAY_BASE, lastReset: now };
           currentRemainingGenerations = usage.count;
           currentResetTime = usage.lastReset + ONE_DAY_MS;
-          // currentMaxGenerations remains CLIENT_MAX_GENERATIONS_PER_DAY_BASE after reset
         }
-      } else { // No usage data, first time or cleared
-        resetClientUsage(); // This also resets bonus eligibility
+      } else {
+        resetClientUsage();
         const freshUsageString = localStorage.getItem(CLIENT_USAGE_STORAGE_KEY);
         usage = freshUsageString ? JSON.parse(freshUsageString) : { count: CLIENT_MAX_GENERATIONS_PER_DAY_BASE, lastReset: now };
         currentRemainingGenerations = usage.count;
         currentResetTime = usage.lastReset + ONE_DAY_MS;
-        // currentMaxGenerations remains CLIENT_MAX_GENERATIONS_PER_DAY_BASE
       }
       setRemainingGenerations(currentRemainingGenerations);
       setMaxGenerations(currentMaxGenerations);
       setResetTime(currentResetTime);
+      setBonusClaimedThisCycle(currentBonusClaimed);
 
     } catch (e) {
       console.error("[PAGE ERROR] Failed to load usage/bonus data from localStorage:", e);
-      resetClientUsage(); // Reset everything if parsing fails
+      resetClientUsage();
     }
 
-    // Referral code logic (remains the same)
     const queryParams = new URLSearchParams(window.location.search);
     const urlReferralCode = queryParams.get('referralCode');
     let activeReferralCode: string | null = null;
@@ -160,14 +158,15 @@ export default function HomePage() {
     
     let newlyAppliedByPostMessage = false;
     if (!activeReferralCode) {
-      const postMessageReferralCode = localStorage.getItem("referralCode"); // Simple string from postMessage
+      const postMessageReferralCode = localStorage.getItem("referralCode"); 
       if (postMessageReferralCode) {
         activeReferralCode = postMessageReferralCode;
         const newReferralData: ReferralCodeData = {
           code: postMessageReferralCode,
           expiresAt: now + REFERRAL_CODE_EXPIRY_DAYS * ONE_DAY_MS,
         };
-        localStorage.setItem(REFERRAL_CODE_STORAGE_KEY, JSON.stringify(newReferralData)); // Promote to standard format
+        localStorage.setItem(REFERRAL_CODE_STORAGE_KEY, JSON.stringify(newReferralData));
+        localStorage.removeItem("referralCode"); // Remove simple string once processed
         newlyAppliedByPostMessage = true;
       }
     }
@@ -178,6 +177,7 @@ export default function HomePage() {
             referralCode: activeReferralCode,
             isMobile: isMobile,
         };
+        console.log("[PAGE CLIENT LOG] Logging 'referral_code_applied' event. Data:", JSON.stringify(eventData));
         logAnalyticsEvent(eventData).catch(err => console.error("[PAGE ERROR] Failed to log 'referral_code_applied' event:", err));
     }
     setStoredReferralCode(activeReferralCode);
@@ -188,6 +188,7 @@ export default function HomePage() {
     loadDataFromLocalStorage();
 
     const handleReferralCodeUpdate = (event: Event) => {
+      console.log("[PAGE CLIENT LOG] 'referralCodeUpdated' event received in page.tsx. Reloading data from localStorage.");
       loadDataFromLocalStorage();
     };
 
@@ -202,7 +203,7 @@ export default function HomePage() {
   const recordClientGeneration = () => {
     const storedUsageString = localStorage.getItem(CLIENT_USAGE_STORAGE_KEY);
     if (!storedUsageString) {
-      resetClientUsage(); // Should not happen if loadDataFromLocalStorage ran
+      resetClientUsage(); 
       return CLIENT_MAX_GENERATIONS_PER_DAY_BASE -1 <= 0;
     }
     const usage: ClientUsageData = JSON.parse(storedUsageString);
@@ -328,7 +329,6 @@ export default function HomePage() {
     const response = await saveContactDetailsAction({ email, consent: true });
 
     if (response.success) {
-      // Log contact submission event immediately after successful save
       const contactEventData = {
         eventType: 'contact_details_submitted' as const,
         email: email,
@@ -338,13 +338,11 @@ export default function HomePage() {
       console.log("[PAGE CLIENT LOG] Logging 'contact_details_submitted' event. Data:", JSON.stringify(contactEventData));
       logAnalyticsEvent(contactEventData).catch(err => console.error("[PAGE ERROR] Failed to log 'contact_details_submitted' event:", err));
 
-      // Now handle bonus generation logic
       const storedUsageString = localStorage.getItem(CLIENT_USAGE_STORAGE_KEY);
       const storedBonusString = localStorage.getItem(EMAIL_BONUS_STORAGE_KEY);
       const usage: ClientUsageData | null = storedUsageString ? JSON.parse(storedUsageString) : null;
       let bonusData: EmailBonusData | null = storedBonusString ? JSON.parse(storedBonusString) : null;
 
-      // Ensure bonusData is initialized if it's somehow null (defensive)
       if (!bonusData) {
           bonusData = { grantedInCycleTimestamp: null };
           localStorage.setItem(EMAIL_BONUS_STORAGE_KEY, JSON.stringify(bonusData));
@@ -352,23 +350,22 @@ export default function HomePage() {
 
       if (usage && bonusData) {
         if (bonusData.grantedInCycleTimestamp === usage.lastReset) {
-          // Bonus already granted in this cycle
           toast({
             title: "Bonus Already Claimed",
             description: `You've already received your ${BONUS_GENERATIONS} bonus generations for this cycle.`,
           });
+          setBonusClaimedThisCycle(true); // Ensure state reflects this
         } else {
-          // Grant bonus
           const newRemaining = Math.min(usage.count + BONUS_GENERATIONS, CLIENT_MAX_GENERATIONS_PER_DAY_BASE + BONUS_GENERATIONS);
           const updatedUsage: ClientUsageData = { ...usage, count: newRemaining };
           localStorage.setItem(CLIENT_USAGE_STORAGE_KEY, JSON.stringify(updatedUsage));
 
-          // Mark bonus as granted for this cycle
           const newBonusData: EmailBonusData = { grantedInCycleTimestamp: usage.lastReset };
           localStorage.setItem(EMAIL_BONUS_STORAGE_KEY, JSON.stringify(newBonusData));
 
           setRemainingGenerations(newRemaining);
           setMaxGenerations(CLIENT_MAX_GENERATIONS_PER_DAY_BASE + BONUS_GENERATIONS);
+          setBonusClaimedThisCycle(true);
 
           toast({
             title: "Bonus Generations Added!",
@@ -380,11 +377,11 @@ export default function HomePage() {
         toast({ variant: "destructive", title: "Client State Error", description: "Could not apply bonus due to an internal state issue. Please refresh and try again."});
       }
       
-      setIsLimitReachedPopupOpen(false); // Close popup after handling
+      setIsLimitReachedPopupOpen(false); 
       setIsSubmittingEmailForBonus(false);
-      return true; // For the outcome of saveContactDetailsAction
+      return true; 
 
-    } else { // saveContactDetailsAction failed
+    } else { 
       setEmailForBonusError(response.error || "Could not save email. Please try again.");
       toast({
         variant: "destructive",
@@ -439,7 +436,10 @@ export default function HomePage() {
         isSubmittingEmail={isSubmittingEmailForBonus}
         emailSubmissionError={emailForBonusError}
         bonusGenerationsCount={BONUS_GENERATIONS}
+        bonusAlreadyClaimed={bonusClaimedThisCycle}
       />
     </div>
   );
 }
+
+    

@@ -13,19 +13,20 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { ExternalLink, Users, X, Mail, Loader2, AlertCircle } from 'lucide-react';
+import { ExternalLink, Users, X, Mail, Loader2, AlertCircle, CheckCircle2 } from 'lucide-react';
 
 interface LimitReachedPopupProps {
   isOpen: boolean;
   onClose: () => void;
-  resetTime: number | undefined; // Timestamp for next reset
+  resetTime: number | undefined; 
   referralCode: string | null;
   communityUrl: string;
-  privacyPolicyUrl: string; // Added for consent text
+  privacyPolicyUrl: string; 
   onEmailSubmit: (email: string) => Promise<boolean>;
   isSubmittingEmail: boolean;
   emailSubmissionError: string | null;
-  bonusGenerationsCount: number; // To display the correct number
+  bonusGenerationsCount: number;
+  bonusAlreadyClaimed: boolean; // New prop
 }
 
 const calculateTimeLeft = (targetTime: number | undefined) => {
@@ -60,6 +61,7 @@ export function LimitReachedPopup({
   isSubmittingEmail,
   emailSubmissionError,
   bonusGenerationsCount,
+  bonusAlreadyClaimed, // Use new prop
 }: LimitReachedPopupProps) {
   const [timeLeft, setTimeLeft] = useState(calculateTimeLeft(resetTime));
   const [email, setEmail] = useState('');
@@ -70,14 +72,14 @@ export function LimitReachedPopup({
       return;
     }
 
-    setTimeLeft(calculateTimeLeft(resetTime)); // Initial calculation
+    setTimeLeft(calculateTimeLeft(resetTime)); 
 
     const timer = setInterval(() => {
       const newTimeLeft = calculateTimeLeft(resetTime);
       setTimeLeft(newTimeLeft);
       if (newTimeLeft.total <= 0) {
         clearInterval(timer);
-        onClose(); // Optionally close popup when time is up
+        onClose(); 
       }
     }, 1000);
 
@@ -86,19 +88,17 @@ export function LimitReachedPopup({
 
   useEffect(() => {
     if (isOpen) {
-      setEmail(''); // Reset email field when popup opens
+      setEmail(''); 
     }
   }, [isOpen]);
 
   const handleLocalEmailSubmit = async () => {
     if (!email.trim()) {
-      // Basic validation, more robust validation can be added
       return;
     }
     const success = await onEmailSubmit(email);
-    if (success) {
-      setEmail(''); // Clear email on success
-    }
+    // No need to clear email here as the form section might disappear
+    // or the parent component handles state changes that cause re-render.
   };
 
   if (!isOpen) {
@@ -108,7 +108,6 @@ export function LimitReachedPopup({
   const unlockBaseUrl = "https://creatorpreneurclub.superprofile.bio/india/";
   let unlockUrl = unlockBaseUrl;
   if (referralCode) {
-    // Robustly append referralCode, handling if unlockBaseUrl already has query params
     const separator = unlockBaseUrl.includes('?') ? '&' : '?';
     unlockUrl = `${unlockBaseUrl}${separator}referralCode=${encodeURIComponent(referralCode)}`;
   }
@@ -134,45 +133,59 @@ export function LimitReachedPopup({
         </div>
         
         <div className="my-4 p-4 border border-dashed border-border rounded-lg bg-card/50">
-          <p className="text-sm text-center text-foreground font-medium mb-2">
-            Want {bonusGenerationsCount} more generations now?
-          </p>
-          <p className="text-xs text-center text-muted-foreground mb-3">
-            Share your email to get <strong>{bonusGenerationsCount} bonus generations</strong> for this cycle and subscribe to our updates.
-            By submitting, you agree to our{' '}
-            <a href={privacyPolicyUrl} target="_blank" rel="noopener noreferrer" className="underline hover:text-primary">
-              Privacy Policy
-            </a>.
-          </p>
-          <div className="relative">
-            <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              type="email"
-              placeholder="you@example.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="pl-10 w-full"
-              disabled={isSubmittingEmail}
-            />
-          </div>
-          {emailSubmissionError && (
-            <p className="mt-2 text-xs text-destructive flex items-center">
-              <AlertCircle className="mr-1 h-3 w-3" />
-              {emailSubmissionError}
-            </p>
+          {bonusAlreadyClaimed ? (
+            <div className="text-center py-3">
+              <CheckCircle2 className="mx-auto h-8 w-8 text-green-500 mb-2" />
+              <p className="text-sm text-foreground font-medium">
+                You've already claimed your {bonusGenerationsCount} bonus generations for this cycle!
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Check back after your daily limit resets for more.
+              </p>
+            </div>
+          ) : (
+            <>
+              <p className="text-sm text-center text-foreground font-medium mb-2">
+                Want {bonusGenerationsCount} more generations now?
+              </p>
+              <p className="text-xs text-center text-muted-foreground mb-3">
+                Share your email to get <strong>{bonusGenerationsCount} bonus generations</strong> for this cycle and subscribe to our updates.
+                By submitting, you agree to our{' '}
+                <a href={privacyPolicyUrl} target="_blank" rel="noopener noreferrer" className="underline hover:text-primary">
+                  Privacy Policy
+                </a>.
+              </p>
+              <div className="relative">
+                <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  type="email"
+                  placeholder="you@example.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="pl-10 w-full"
+                  disabled={isSubmittingEmail}
+                />
+              </div>
+              {emailSubmissionError && (
+                <p className="mt-2 text-xs text-destructive flex items-center">
+                  <AlertCircle className="mr-1 h-3 w-3" />
+                  {emailSubmissionError}
+                </p>
+              )}
+              <Button
+                onClick={handleLocalEmailSubmit}
+                disabled={isSubmittingEmail || !email.includes('@')}
+                className="w-full mt-3"
+                variant="default"
+              >
+                {isSubmittingEmail ? (
+                  <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Submitting...</>
+                ) : (
+                  `Submit Email & Get ${bonusGenerationsCount} Bonus`
+                )}
+              </Button>
+            </>
           )}
-          <Button
-            onClick={handleLocalEmailSubmit}
-            disabled={isSubmittingEmail || !email.includes('@')}
-            className="w-full mt-3"
-            variant="default"
-          >
-            {isSubmittingEmail ? (
-              <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Submitting...</>
-            ) : (
-              `Submit Email & Get ${bonusGenerationsCount} Bonus`
-            )}
-          </Button>
         </div>
 
         <AlertDialogFooter className="flex flex-col sm:flex-row sm:justify-between items-center pt-2 gap-2">
@@ -207,3 +220,5 @@ export function LimitReachedPopup({
     </AlertDialog>
   );
 }
+
+    

@@ -24,7 +24,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { Captions, FileText, Film, Instagram, Linkedin, Loader2, Type, Youtube, Users } from 'lucide-react';
+import { Captions, FileText, Film, Instagram, Linkedin, Loader2, Type, Youtube, Users, Zap } from 'lucide-react';
 import type { SuggestKeywordsInput } from '@/ai/flows/suggest-keywords';
 
 const formSchema = z.object({
@@ -46,6 +46,7 @@ type KeywordFormValues = z.infer<typeof formSchema>;
 interface KeywordFormProps {
   onSubmit: (values: SuggestKeywordsInput) => Promise<void>;
   isLoading: boolean;
+  isUnlimited?: boolean; // New prop
   remainingGenerations: number | null;
   maxGenerations: number | null;
   resetTime?: number;
@@ -64,7 +65,14 @@ const platformOptions = [
   { value: 'linkedin video', label: 'LinkedIn Video', icon: <Linkedin className="mr-2 h-4 w-4" /> },
 ];
 
-export function KeywordForm({ onSubmit, isLoading, remainingGenerations, maxGenerations, resetTime }: KeywordFormProps) {
+export function KeywordForm({ 
+    onSubmit, 
+    isLoading, 
+    isUnlimited = false, // Default to false
+    remainingGenerations, 
+    maxGenerations, 
+    resetTime 
+}: KeywordFormProps) {
   const form = useForm<KeywordFormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -88,8 +96,16 @@ export function KeywordForm({ onSubmit, isLoading, remainingGenerations, maxGene
   };
 
   const renderUsageInfo = () => {
+    if (isUnlimited) {
+      return (
+        <div className="text-xs text-accent flex items-center justify-center md:justify-end md:ml-auto whitespace-nowrap">
+          <Zap className="mr-1.5 h-3.5 w-3.5 shrink-0" />
+          Unlimited Generations
+        </div>
+      );
+    }
+
     if (isLoading && (remainingGenerations === null || maxGenerations === null)) {
-        // Show nothing or a subtle loader if preferred during the form's own loading state
         return <div className="h-5 w-28 animate-pulse rounded bg-muted/50 md:ml-auto"></div>;
     }
     if (remainingGenerations !== null && maxGenerations !== null) {
@@ -104,7 +120,7 @@ export function KeywordForm({ onSubmit, isLoading, remainingGenerations, maxGene
         </div>
       );
     }
-    return <div className="h-5 w-28 md:ml-auto"></div>; // Placeholder for alignment if no data
+    return <div className="h-5 w-28 md:ml-auto"></div>; 
   };
 
   return (

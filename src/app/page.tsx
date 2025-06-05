@@ -10,12 +10,12 @@ export default function RootPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl w-full mt-12"> {/* Added mt-12 for some top spacing */}
         <div className="bg-card p-8 rounded-xl shadow-xl flex flex-col items-center text-center">
           <ShieldCheck className="h-16 w-16 text-primary mb-6" />
-          <h2 className="text-3xl font-semibold mb-3">Standard Access</h2>
-          <p className="text-muted-foreground mb-8">
+          {/* <h2 className="text-3xl font-semibold mb-3">Standard Access</h2> */}
+          {/* <p className="text-muted-foreground mb-8">
             Get 5 free keyword generations daily, with an option for bonus generations. Perfect for regular use.
-          </p>
+          </p> */}
           <Link href="/limit" legacyBehavior passHref>
-            <Button size="lg" className="w-full">
+            <Button size="lg" className="w-full mt-auto"> {/* Added mt-auto to push button down if space allows */}
               Go to Standard Version
             </Button>
           </Link>

@@ -398,15 +398,7 @@ export default function LimitedHomePage() {
     <div className="min-h-screen flex flex-col bg-background">
       <main className="flex-grow container mx-auto px-4 md:px-6 py-8 md:py-12">
         <section className="max-w-6xl mx-auto">
-          <div className="text-center mb-8 md:mb-12">
-            <h1 className="text-3xl md:text-4xl font-bold tracking-tight text-foreground mb-3">
-              Keyword Generator - Standard Access
-            </h1>
-            <p className="mt-2 text-xs text-muted-foreground/80">
-              Try it out with {CLIENT_MAX_GENERATIONS_PER_DAY_BASE} free keyword generations daily, which reset every 24 hours. Reached your limit? You can get {BONUS_GENERATIONS} bonus generations.
-            </p>
-          </div>
-
+          {/* Heading and subheading div removed */}
           <div className="grid md:grid-cols-2 gap-8 items-stretch">
             <div className="bg-card p-6 sm:p-8 rounded-xl shadow-xl h-full flex flex-col">
               <KeywordForm

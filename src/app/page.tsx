@@ -6,14 +6,8 @@ import { Zap, ShieldCheck } from 'lucide-react';
 export default function RootPage() {
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-background text-foreground p-4">
-      <header className="text-center mb-12">
-        <h1 className="text-5xl font-bold mb-4">ReelRank Keywords</h1>
-        <p className="text-xl text-muted-foreground">
-          Choose your keyword generation experience.
-        </p>
-      </header>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl w-full">
+      {/* Header section removed */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl w-full mt-12"> {/* Added mt-12 for some top spacing */}
         <div className="bg-card p-8 rounded-xl shadow-xl flex flex-col items-center text-center">
           <ShieldCheck className="h-16 w-16 text-primary mb-6" />
           <h2 className="text-3xl font-semibold mb-3">Standard Access</h2>

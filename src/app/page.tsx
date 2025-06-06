@@ -1,48 +1,4 @@
 
-<<<<<<< HEAD
-import Link from 'next/link';
-import { Button } from '@/components/ui/button';
-import { Zap, ShieldCheck } from 'lucide-react';
-
-export default function RootPage() {
-  return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-background text-foreground p-4">
-      {/* Header section removed */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl w-full mt-12"> {/* Added mt-12 for some top spacing */}
-        <div className="bg-card p-8 rounded-xl shadow-xl flex flex-col items-center text-center">
-          <ShieldCheck className="h-16 w-16 text-primary mb-6" />
-          {/* <h2 className="text-3xl font-semibold mb-3">Standard Access</h2> */}
-          {/* <p className="text-muted-foreground mb-8">
-            Get 5 free keyword generations daily, with an option for bonus generations. Perfect for regular use.
-          </p> */}
-          <Link href="/limit" legacyBehavior passHref>
-            <Button size="lg" className="w-full mt-auto"> {/* Added mt-auto to push button down if space allows */}
-              Go to Standard Version
-            </Button>
-          </Link>
-        </div>
-
-        <div className="bg-card p-8 rounded-xl shadow-xl flex flex-col items-center text-center">
-          <Zap className="h-16 w-16 text-accent mb-6" />
-          <h2 className="text-3xl font-semibold mb-3">Unlimited Access</h2>
-          <p className="text-muted-foreground mb-8">
-            Enjoy unlimited keyword generations. Ideal for extensive research and power users.
-          </p>
-          <Link href="/free" legacyBehavior passHref>
-            <Button size="lg" variant="outline" className="w-full border-accent text-accent hover:bg-accent/10">
-              Go to Unlimited Version
-            </Button>
-          </Link>
-        </div>
-      </div>
-
-      <footer className="mt-16 text-center text-muted-foreground text-sm">
-        <p>&copy; {new Date().getFullYear()} ReelRank Keywords. All rights reserved.</p>
-        <p className="mt-1">
-          <Link href="/privacy-policy" className="underline hover:text-primary">Privacy Policy</Link>
-        </p>
-      </footer>
-=======
 'use client';
 
 import type React from 'react';
@@ -80,7 +36,7 @@ interface EmailBonusData {
   grantedInCycleTimestamp: number | null;
 }
 
-export default function HomePage() { // Renamed from LimitedHomePage
+export default function HomePage() {
   const [results, setResults] = useState<SuggestKeywordsOutput | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -167,11 +123,11 @@ export default function HomePage() { // Renamed from LimitedHomePage
       setBonusClaimedThisCycle(currentBonusClaimed);
 
     } catch (e) {
-      console.error("[PAGE ERROR /] Failed to load usage/bonus data from localStorage:", e); // Updated path
+      console.error("[PAGE ERROR /] Failed to load usage/bonus data from localStorage:", e);
       resetClientUsage();
     }
 
-    const queryParams = new URLSearchParams(window.location.search);
+    const queryParams = new URLSearchParams(typeof window !== 'undefined' ? window.location.search : '');
     const urlReferralCode = queryParams.get('referralCode');
     let activeReferralCode: string | null = null;
     let newlyAppliedByUrl = false;
@@ -196,13 +152,13 @@ export default function HomePage() { // Renamed from LimitedHomePage
           }
         } catch (e) {
           localStorage.removeItem(REFERRAL_CODE_STORAGE_KEY_LIMIT);
-          console.error("[PAGE ERROR /] Error parsing referralCodeData_limit, removed from localStorage:", e); // Updated path
+          console.error("[PAGE ERROR /] Error parsing referralCodeData_limit, removed from localStorage:", e);
         }
       }
     }
     
     let newlyAppliedByPostMessage = false;
-    if (!activeReferralCode) {
+    if (!activeReferralCode && typeof window !== 'undefined') {
       const postMessageReferralCode = localStorage.getItem("referralCode"); 
       if (postMessageReferralCode) {
         activeReferralCode = postMessageReferralCode;
@@ -222,8 +178,8 @@ export default function HomePage() { // Renamed from LimitedHomePage
             referralCode: activeReferralCode,
             isMobile: isMobile,
         };
-        console.log("[PAGE CLIENT LOG /] Logging 'referral_code_applied' event. Data:", JSON.stringify(eventData)); // Updated path
-        logAnalyticsEvent(eventData).catch(err => console.error("[PAGE ERROR /] Failed to log 'referral_code_applied' event:", err)); // Updated path
+        console.log("[PAGE CLIENT LOG /] Logging 'referral_code_applied' event. Data:", JSON.stringify(eventData));
+        logAnalyticsEvent(eventData).catch(err => console.error("[PAGE ERROR /] Failed to log 'referral_code_applied' event:", err));
     }
     setStoredReferralCode(activeReferralCode);
 
@@ -233,7 +189,7 @@ export default function HomePage() { // Renamed from LimitedHomePage
     loadDataFromLocalStorage();
 
     const handleReferralCodeUpdate = (event: Event) => {
-      console.log("[PAGE CLIENT LOG /] 'referralCodeUpdated' event received. Reloading data from localStorage."); // Updated path
+      console.log("[PAGE CLIENT LOG /] 'referralCodeUpdated' event received. Reloading data from localStorage.");
       loadDataFromLocalStorage();
     };
 
@@ -288,8 +244,8 @@ export default function HomePage() { // Renamed from LimitedHomePage
             wasAlreadyLimited: true,
             isMobile: isMobile,
         };
-        console.log("[PAGE CLIENT LOG /] Logging 'already_limited_attempt' event. Data:", JSON.stringify(eventData)); // Updated path
-        logAnalyticsEvent(eventData).catch(err => console.error("[PAGE ERROR /] Failed to log 'already_limited_attempt' event:", err)); // Updated path
+        console.log("[PAGE CLIENT LOG /] Logging 'already_limited_attempt' event. Data:", JSON.stringify(eventData));
+        logAnalyticsEvent(eventData).catch(err => console.error("[PAGE ERROR /] Failed to log 'already_limited_attempt' event:", err));
         return;
     }
 
@@ -302,8 +258,8 @@ export default function HomePage() { // Renamed from LimitedHomePage
         wasAlreadyLimited: false,
         isMobile: isMobile,
     };
-    console.log("[PAGE CLIENT LOG /] Logging 'keyword_generation_attempt' event. Data:", JSON.stringify(attemptEventData)); // Updated path
-    logAnalyticsEvent(attemptEventData).catch(err => console.error("[PAGE ERROR /] Failed to log 'keyword_generation_attempt' event:", err)); // Updated path
+    console.log("[PAGE CLIENT LOG /] Logging 'keyword_generation_attempt' event. Data:", JSON.stringify(attemptEventData));
+    logAnalyticsEvent(attemptEventData).catch(err => console.error("[PAGE ERROR /] Failed to log 'keyword_generation_attempt' event:", err));
 
     const response = await getKeywordsAction(values);
     let dailyLimitReachedThisAttempt = false;
@@ -326,8 +282,8 @@ export default function HomePage() { // Renamed from LimitedHomePage
         wasAlreadyLimited: false,
         isMobile: isMobile,
       };
-      console.log("[PAGE CLIENT LOG /] Logging 'keyword_generation_success' event. Data:", JSON.stringify(successEventData)); // Updated path
-      logAnalyticsEvent(successEventData).catch(err => console.error("[PAGE ERROR /] Failed to log 'keyword_generation_success' event:", err)); // Updated path
+      console.log("[PAGE CLIENT LOG /] Logging 'keyword_generation_success' event. Data:", JSON.stringify(successEventData));
+      logAnalyticsEvent(successEventData).catch(err => console.error("[PAGE ERROR /] Failed to log 'keyword_generation_success' event:", err));
     } else {
       setError(response.error);
       toast({
@@ -345,8 +301,8 @@ export default function HomePage() { // Renamed from LimitedHomePage
         isMobile: isMobile,
         errorMessage: response.error,
       };
-      console.log("[PAGE CLIENT LOG /] Logging 'keyword_generation_failure' event. Data:", JSON.stringify(failureEventData)); // Updated path
-      logAnalyticsEvent(failureEventData).catch(err => console.error("[PAGE ERROR /] Failed to log 'keyword_generation_failure' event:", err)); // Updated path
+      console.log("[PAGE CLIENT LOG /] Logging 'keyword_generation_failure' event. Data:", JSON.stringify(failureEventData));
+      logAnalyticsEvent(failureEventData).catch(err => console.error("[PAGE ERROR /] Failed to log 'keyword_generation_failure' event:", err));
     }
     setIsLoading(false);
 
@@ -362,8 +318,8 @@ export default function HomePage() { // Renamed from LimitedHomePage
           wasAlreadyLimited: false,
           isMobile: isMobile,
         };
-        console.log("[PAGE CLIENT LOG /] Logging 'limit_hit_on_attempt' event. Data:", JSON.stringify(limitHitEventData)); // Updated path
-        logAnalyticsEvent(limitHitEventData).catch(err => console.error("[PAGE ERROR /] Failed to log 'limit_hit_on_attempt' event:", err)); // Updated path
+        console.log("[PAGE CLIENT LOG /] Logging 'limit_hit_on_attempt' event. Data:", JSON.stringify(limitHitEventData));
+        logAnalyticsEvent(limitHitEventData).catch(err => console.error("[PAGE ERROR /] Failed to log 'limit_hit_on_attempt' event:", err));
     }
   };
 
@@ -380,8 +336,8 @@ export default function HomePage() { // Renamed from LimitedHomePage
         referralCode: storedReferralCode,
         isMobile: isMobile,
       };
-      console.log("[PAGE CLIENT LOG /] Logging 'contact_details_submitted' event. Data:", JSON.stringify(contactEventData)); // Updated path
-      logAnalyticsEvent(contactEventData).catch(err => console.error("[PAGE ERROR /] Failed to log 'contact_details_submitted' event:", err)); // Updated path
+      console.log("[PAGE CLIENT LOG /] Logging 'contact_details_submitted' event. Data:", JSON.stringify(contactEventData));
+      logAnalyticsEvent(contactEventData).catch(err => console.error("[PAGE ERROR /] Failed to log 'contact_details_submitted' event:", err));
 
       const storedUsageString = localStorage.getItem(CLIENT_USAGE_STORAGE_KEY_LIMIT);
       const storedBonusString = localStorage.getItem(EMAIL_BONUS_STORAGE_KEY_LIMIT);
@@ -418,7 +374,7 @@ export default function HomePage() { // Renamed from LimitedHomePage
           });
         }
       } else {
-        console.error("[PAGE ERROR /] Usage or Bonus data missing in localStorage during email bonus handling."); // Updated path
+        console.error("[PAGE ERROR /] Usage or Bonus data missing in localStorage during email bonus handling.");
         toast({ variant: "destructive", title: "Client State Error", description: "Could not apply bonus due to an internal state issue. Please refresh and try again."});
       }
       
@@ -479,9 +435,6 @@ export default function HomePage() { // Renamed from LimitedHomePage
         bonusGenerationsCount={BONUS_GENERATIONS}
         bonusAlreadyClaimed={bonusClaimedThisCycle}
       />
->>>>>>> 3bb97a2 (i dont want any buttons to redirections just show the limit one as defau)
     </div>
   );
 }
-
-    
